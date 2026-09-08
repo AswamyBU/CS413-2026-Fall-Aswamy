@@ -146,9 +146,24 @@ def search(bd, i, j, nsol):
 
 
 def main():
-    bd0 = (-1, -1, -1, -1, -1, -1, -1, -1)
-    nsol = search(bd0, 0, 0, 0)
-    print("The total number of solutions is: ", nsol, "\n", sep="", end="")
+  bd0 = (-1, -1, -1, -1, -1, -1, -1, -1)
+  nsol = search(bd0, 0, 0, 0)
+  print("The total number of solutions is: ", nsol, "\n", sep="", end="")
+
+
+  #TEST CASES
+  assert nsol == 92, "normal: 8-queens has 92 solutions"
+  print("normal case (full solver -> 92 solutions): PASS")
+
+  assert board_get((0,) * N, N) == -1, "edge: index N (just past the end) should return -1"
+  assert board_get((0,) * N, -1) == -1, "edge: negative index should return -1"
+  print("edge cases (board_get out of range --> -1): PASS")
+
+  assert safety_test1(0, 0, 2, 2) is False, "normal: same diagonal -> not safe"
+  assert safety_test1(0, 0, 2, 0) is False, "normal: same column -> not safe"
+  assert safety_test1(0, 0, 2, 3) is True,  "normal: different col and diagonal -> safe"
+  print("safety_test1 (column/diagonal attack rule): PASS")
+
 
 
 if __name__ == "__main__":
