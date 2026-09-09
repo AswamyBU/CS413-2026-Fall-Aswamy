@@ -1,0 +1,11 @@
+
+## AI REFLECTION ##
+The AI was strong at the mechanical core of the translation. It correctly mapped the ATS structure onto Python — preserving the 8-tuple board as an immutable tuple, keeping board_set copy-on-update rather than mutating in place, and recognizing that the tail-recursive search function had to become an explicit while loop, since Python lacks tail-call optimization and would otherwise overflow the stack. It also reproduced the exact output formatting, which is easy to get wrong.
+
+Its weaknesses showed up mostly in the tests rather than the translation. When helping me figure out the test cases, it initially tried giving me an edge case parameter that checked board_get for an out-of-range value against the wrong expected result, and a safety_test1 case labeled "same column" that actually used two different columns. Both failed when I ran them, and only then did I correct them. This taught me that the AI's confident labeling of a test does not guarantee the test is right.
+
+To verify the translation, I had to understand the algorithm myself: how the depth-first search backtracks, why the board uses column-per-row encoding, and what the diagonal check (abs(i0-i1) != abs(j0-j1)) actually means. Without that, I couldn't tell whether a passing or failing assertion was meaningful. The known result — 92 solutions — was my anchor, but I also had to reason about individual cases.
+
+I don't think the AI-generated version could have been trusted without testing. It happened to produce the correct solution count, but the wrong test cases proved that confident-looking AI output can be slightly incorrect. Only running the code against a known answer, and checking specific inputs manually, gave real confidence.
+
+AI changed the nature of the work more than the amount. It removed the tedious line-by-line porting, but shifted my effort toward verification, spotting errors, and understanding the original well enough to judge the output. I spent less time typing and more time checking — which was arguably more valuable.
