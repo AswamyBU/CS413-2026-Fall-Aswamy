@@ -120,6 +120,10 @@ def t0erm_subst0\
     def subst0(term: t0erm) -> t0erm:
         if False:
             return None
+        elif isinstance(term, T0Mint):
+            return term
+        elif isinstance(term, T0Mbtf):
+            return term
         elif isinstance(term, T0Mvar):
             return tsub if x0 == term.arg1 else term
         elif isinstance(term, T0Mlam):
@@ -130,6 +134,8 @@ def t0erm_subst0\
                 return T0Mlam(x1, subst0(term.arg2))
         elif isinstance(term, T0Mapp):
             return T0Mapp(subst0(term.arg1), subst0(term.arg2))
+        elif isinstance(term, T0Mif0):
+            return T0Mif0(subst0(term.arg1), subst0(term.arg2), subst0(term.arg3))
         else:
             raise TypeError(f"subst0({term})")
     return subst0(term)
