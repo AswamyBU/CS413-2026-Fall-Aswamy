@@ -1,0 +1,13 @@
+I have just covered Software Architectures. I want my students to use
+MVC to build a web front-end for programming language system (where
+the language is LAMBDA).
+
+Input: A user can upload a file containing some code from his own
+computer
+
+Actions: there are some buttons to determine what actions can be
+performed: lint (checking if there exists an undeclared variable),
+interpret (d0exp_evaluate), type-check (placeholder), compile
+(placeholder), execute (for testing generated code).
+
+Output: Textural output can be shown on the web page.

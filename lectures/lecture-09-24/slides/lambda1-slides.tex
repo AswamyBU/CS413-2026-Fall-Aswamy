@@ -1,0 +1,361 @@
+\documentclass[aspectratio=169,11pt]{beamer}
+\usetheme{Boadilla}
+\usecolortheme{seahorse}
+\usepackage{listings}
+\usepackage{amsmath,amssymb,booktabs}
+\definecolor{codeblue}{RGB}{25,65,125}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+\setbeamercolor{structure}{fg=codeblue}
+\lstset{language=Python,basicstyle=\ttfamily\small,keywordstyle=\color{codeblue}\bfseries,commentstyle=\color{gray},stringstyle=\color{teal},showstringspaces=false,columns=fullflexible,keepspaces=true,breaklines=true,tabsize=4}
+\title{A Closure-Based Lambda Interpreter}
+\subtitle{Reading \texttt{lambda1.py}}
+\author{CS413}
+\date{September 22, 2026}
+\begin{document}
+\begin{frame}\titlepage\end{frame}
+
+\begin{frame}[fragile]{The evaluator's interface}
+\begin{lstlisting}
+def d0exp_evaluate\
+(dexp: d0exp, denv: d0env = ENVnil()) -> d0val:
+    """
+    [dexp] may contain free variables
+    """
+\end{lstlisting}
+\bigskip
+\begin{itemize}
+\item An expression describes a computation.
+\item An environment gives values to variable names.
+\item Evaluation produces a value, including a closure for a function.
+\item The interpreter uses call-by-value and lexical scope.
+\end{itemize}
+\medskip
+The \texttt{type} aliases in this file require Python 3.12 or later.
+\end{frame}
+
+\begin{frame}{The expression language}
+\begin{center}
+\begin{tabular}{ll}\toprule
+Constructors & Meaning\\\midrule
+\texttt{D0Eint, D0Ebtf} & Integer and Boolean literals\\
+\texttt{D0Evar} & Variable lookup\\
+\texttt{D0Elam, D0Efix} & Ordinary and recursive functions\\
+\texttt{D0Eapp} & Function application\\
+\texttt{D0Elet} & Local, nonrecursive binding\\
+\texttt{D0Eop1, D0Eop2} & Integer operations and comparisons\\
+\texttt{D0Eif0} & Boolean conditional\\
+\texttt{D0Epair, D0Epfst, D0Epsnd} & Pairs and projections\\\bottomrule
+\end{tabular}
+\end{center}
+\medskip
+The file consumes abstract syntax trees. It does not parse source text.
+\end{frame}
+
+\begin{frame}[fragile]{Constructing an expression}
+\[
+(\lambda x.\,x+1)\;41
+\]
+\begin{lstlisting}
+increment = D0Elam("x",
+    D0Eop1("+1", D0Evar("x")))
+
+term = D0Eapp(increment, D0Eint(41))
+
+d0exp_evaluate(term)  # D0Vint(arg1=42)
+\end{lstlisting}
+\bigskip
+\texttt{D0Eapp} constructs syntax. \texttt{d0exp\_evaluate} executes it.\\[0.6em]
+\texttt{@dataclass} supplies constructors, representations, and equality.
+\end{frame}
+
+\begin{frame}[fragile]{Expressions and values have different roles}
+\begin{columns}[T]
+\begin{column}{0.49\textwidth}
+\begin{lstlisting}
+@dataclass
+class D0Elam(D0E000):
+    arg1: dvar
+    arg2: d0exp
+    ctag = "D0Elam"
+\end{lstlisting}
+\medskip
+A lambda expression stores its parameter and body.
+\end{column}
+\begin{column}{0.49\textwidth}
+\begin{lstlisting}
+@dataclass
+class D0Vlam(D0V000):
+    arg1: d0env
+    arg2: D0Elam
+    ctag = "D0Vlam"
+\end{lstlisting}
+\medskip
+A closure stores an environment together with that expression.
+\end{column}
+\end{columns}
+\bigskip
+Other values are \texttt{D0Vint}, \texttt{D0Vbtf}, \texttt{D0Vpair}, and \texttt{D0Vfix}.\\[0.6em]
+The evaluator dispatches with \texttt{isinstance}, rather than \texttt{ctag}.
+\end{frame}
+
+\begin{frame}[fragile]{Environments are linked bindings}
+\begin{lstlisting}
+@dataclass(frozen=True)
+class ENVcns(ENV000):
+    arg1: dvar
+    arg2: d0val
+    arg3: d0env
+    ctag = "ENVcns"
+
+outer = ENVcns("x", D0Vint(10), ENVnil())
+inner = ENVcns("x", D0Vint(20), outer)
+\end{lstlisting}
+\medskip
+\texttt{ENVnil()} ends the chain. Each new binding retains the outer chain.\\[0.6em]
+The links are frozen. The referenced values and syntax trees are not frozen.
+\end{frame}
+
+\begin{frame}[fragile]{Lookup chooses the nearest binding}
+\begin{lstlisting}
+def d0env_search(denv: d0env, dvar: dvar) -> d0val:
+    while True:
+        if isinstance(denv, ENVcns):
+            if dvar == denv.arg1:
+                return denv.arg2
+            else:
+                denv = denv.arg3; continue
+        else:
+            return D0V000() # HX: this indicates an error
+\end{lstlisting}
+\medskip
+For the preceding environments, lookup of \texttt{x} gives 20 in \texttt{inner},\\
+but still gives 10 in \texttt{outer}. A missing name yields \texttt{D0V000()}.
+\end{frame}
+
+\begin{frame}[fragile]{Evaluating a lambda creates a closure}
+Evaluator excerpt:
+\begin{lstlisting}
+elif isinstance(dexp, D0Elam):
+    return D0Vlam(denv, dexp)
+elif isinstance(dexp, D0Efix):
+    return D0Vfix(denv, dexp)
+\end{lstlisting}
+\bigskip
+\begin{itemize}
+\item The closure captures the environment at the function's definition.
+\item Creating a closure does not evaluate its body.
+\item The body can use captured bindings when a later call executes it.
+\end{itemize}
+\medskip
+No substitution or copying of the function body occurs here.
+\end{frame}
+
+\begin{frame}[fragile]{Application of an ordinary closure}
+Excerpts from \texttt{f0\_D0Eapp}:
+\begin{lstlisting}
+dfun = d0exp_evaluate(dexp.arg1, denv)
+darg = d0exp_evaluate(dexp.arg2, denv)
+\end{lstlisting}
+For a \texttt{D0Vlam} value:
+\begin{lstlisting}
+dlam = dfun.arg2
+denv_new = ENVcns(dlam.arg1, darg, dfun.arg1)
+return d0exp_evaluate(dlam.arg2, denv_new)
+\end{lstlisting}
+\medskip
+The caller's environment evaluates the function and argument, in that order.\\[0.6em]
+The \alert{captured environment} evaluates the body, with the parameter added.
+\end{frame}
+
+\begin{frame}[fragile]{Lexical scope in a worked example}
+Readable notation for a nested AST:
+\begin{lstlisting}[language={}]
+let x = 10 in
+  let f = (lambda y. x + y) in
+    let x = 100 in
+      f(2)
+\end{lstlisting}
+\bigskip
+\begin{tabular}{ll}
+When \texttt{f} is defined & Its closure captures \texttt{x = 10}.\\[0.7em]
+When \texttt{f(2)} is called & The caller has \texttt{x = 100}.\\[0.7em]
+When the body runs & It finds \texttt{y = 2}, then captured \texttt{x = 10}.\\
+\end{tabular}
+\par
+\bigskip
+\alert{Result: \texttt{D0Vint(12)}}
+\end{frame}
+
+\begin{frame}[fragile]{A let evaluates its initializer before binding}
+Body of \texttt{f0\_D0Elet}:
+\begin{lstlisting}
+dval = d0exp_evaluate(dexp.arg2, denv)
+denv_new = ENVcns(dexp.arg1, dval, denv)
+return d0exp_evaluate(dexp.arg3, denv_new)
+\end{lstlisting}
+\bigskip
+In \texttt{D0Elet(name, initializer, body)}:
+\begin{itemize}
+\item The initializer uses the old environment.
+\item Only the body sees the new binding.
+\item Even an unused initializer executes.
+\end{itemize}
+\medskip
+Example: with outer \texttt{x = 10}, \texttt{let x = x+1 in x} yields 11.\\
+The outer binding remains 10. This form of let is nonrecursive.
+\end{frame}
+
+\begin{frame}[fragile]{A recursive function names itself}
+\begin{lstlisting}
+@dataclass
+class D0Efix(D0E000):
+    arg1: dvar
+    arg2: dvar
+    arg3: d0exp
+    ctag = "D0Efix"
+\end{lstlisting}
+\bigskip
+\texttt{D0Efix("f", "x", body)} represents $\mathrm{fix}\ f(x).\,body$.\\[0.7em]
+\texttt{arg1} names the function itself, \texttt{arg2} names its parameter,\\
+and \texttt{arg3} holds its body.\\[0.7em]
+Evaluation creates \texttt{D0Vfix(denv, dexp)}. A call adds the self binding.
+\end{frame}
+
+\begin{frame}[fragile]{Application of a recursive closure}
+The \texttt{D0Vfix} branch of \texttt{f0\_D0Eapp}:
+\begin{lstlisting}
+dfix = dfun.arg2
+denv_new0 = dfun.arg1
+denv_new1 = \
+    ENVcns(dfix.arg1, dfun, denv_new0)
+denv_new2 = \
+    ENVcns(dfix.arg2, darg, denv_new1)
+return d0exp_evaluate(dfix.arg3, denv_new2)
+\end{lstlisting}
+\medskip
+Lookup order: parameter, function's own name, captured bindings.\\[0.6em]
+Binding the function name to \texttt{dfun} lets the body call the same closure.\\[0.6em]
+If the parameter and function names coincide, the parameter shadows it.
+\end{frame}
+
+\begin{frame}[fragile]{Factorial as an abstract syntax tree}
+\begin{lstlisting}
+factorial = D0Efix("fact", "n",
+    D0Eif0(
+        D0Eop2("<=", D0Evar("n"), D0Eint(0)),
+        D0Eint(1),
+        D0Eop2("*", D0Evar("n"),
+            D0Eapp(D0Evar("fact"),
+                D0Eop1("-1", D0Evar("n"))))))
+
+d0exp_evaluate(D0Eapp(factorial, D0Eint(4)))
+# D0Vint(arg1=24)
+\end{lstlisting}
+\medskip
+Each call adds a new \texttt{n} binding and the same \texttt{fact} closure.\\[0.6em]
+The calls descend through 4, 3, 2, 1, 0. Multiplication finishes as they return.
+\end{frame}
+
+\begin{frame}[fragile]{Conditionals evaluate only the selected branch}
+Body of \texttt{f0\_D0Eif0}:
+\begin{lstlisting}
+dexp1 = d0exp_evaluate(dexp.arg1, denv)
+if not isinstance(dexp1, D0Vbtf):
+    raise TypeError(f"D0Vbtf(...) expected: {dexp1}")
+if dexp1.arg1:
+    return d0exp_evaluate(dexp.arg2, denv)
+else:
+    return d0exp_evaluate(dexp.arg3, denv)
+\end{lstlisting}
+\medskip
+Despite its name, \texttt{D0Eif0} expects a Boolean, not an integer zero test.\\[0.6em]
+In factorial, the base case avoids evaluating the recursive branch.
+\end{frame}
+
+\begin{frame}{Primitive operations check value kinds}
+\begin{center}
+\begin{tabular}{lll}\toprule
+Operators & Operand values & Result value\\\midrule
+\texttt{+1, -1} & One \texttt{D0Vint} & \texttt{D0Vint}\\
+\texttt{+, -, *, /} & Two \texttt{D0Vint}s & \texttt{D0Vint}\\
+\texttt{<, >, <=, >=, ==, !=} & Two \texttt{D0Vint}s & \texttt{D0Vbtf}\\\bottomrule
+\end{tabular}
+\end{center}
+\bigskip
+\begin{itemize}
+\item Binary operations evaluate both operands from left to right.
+\item The interpreter's \texttt{/} uses Python's floor division \texttt{//}.\\
+For example, $-7/3$ produces \texttt{D0Vint(-3)}.
+\item Wrong operand kinds and unsupported operators raise \texttt{TypeError}.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Pairs evaluate both components}
+The \texttt{D0Epair} branch:
+\begin{lstlisting}
+dval1 = d0exp_evaluate(dexp.arg1, denv)
+dval2 = d0exp_evaluate(dexp.arg2, denv)
+return D0Vpair(dval1, dval2)
+\end{lstlisting}
+\medskip
+\texttt{D0Epfst(e)} and \texttt{D0Epsnd(e)} evaluate \texttt{e}, require a\\
+\texttt{D0Vpair}, then select one component.\\[0.7em]
+Pairs can contain mixed kinds, nested pairs, and closures.
+\begin{lstlisting}
+d0exp_evaluate(D0Epfst(
+    D0Epair(D0Eint(7), D0Ebtf(True))))
+# D0Vint(arg1=7)
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Call-by-value makes unused computations matter}
+Let \texttt{bad} be an expression that divides by zero:
+\begin{lstlisting}
+bad = D0Eop2("/", D0Eint(1), D0Eint(0))
+
+D0Eapp(D0Elam("x", D0Eint(7)), bad)
+D0Elet("x", bad, D0Eint(7))
+D0Epfst(D0Epair(D0Eint(7), bad))
+\end{lstlisting}
+Evaluating any of these three expressions raises \texttt{ZeroDivisionError}.
+\par
+\bigskip
+By contrast, this conditional produces \texttt{D0Vint(7)}:
+\begin{lstlisting}
+D0Eif0(D0Ebtf(True), D0Eint(7), bad)
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}{Errors and implementation boundaries}
+\begin{itemize}
+\item An unbound variable returns the sentinel \texttt{D0V000()}.\\
+It can propagate as a result or become a pair component.
+\item Invalid application, projection, or operand kinds raise \texttt{TypeError}.
+\item Application evaluates the argument before checking the function kind.\\
+An argument's error can therefore occur first.
+\item Dataclass annotations assume correctly formed ASTs and environments.\\
+They do not validate constructor arguments.
+\item Evaluation uses Python recursion, including for tail calls.\\
+Deep calls can exceed the recursion limit. Some terms never terminate.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Questions for tracing the interpreter}
+\begin{enumerate}
+\item What happens if application extends the caller's environment instead of
+\texttt{dfun.arg1}? Revisit the example with \texttt{x = 10} and \texttt{x = 100}.
+\item Why does \texttt{D0Vfix} application add the function's own binding?
+\item What does this expression return?
+\end{enumerate}
+\begin{lstlisting}
+D0Eapp(
+    D0Eapp(D0Elam("x", D0Elam("y", D0Evar("x"))),
+           D0Eint(10)),
+    D0Eint(20))
+\end{lstlisting}
+\medskip
+Relevant examples and checks: \texttt{TEST/test03\_lambda1.py}\\
+Run with \texttt{python3 -B TEST/test03\_lambda1.py}.
+\end{frame}
+\end{document}
