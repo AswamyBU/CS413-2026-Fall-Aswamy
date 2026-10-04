@@ -1,0 +1,2 @@
+# Passes Lint, fails at runtime: applying an integer as if it were a function.
+D0Eapp(D0Eint(3), D0Eint(4))

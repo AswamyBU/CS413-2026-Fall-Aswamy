@@ -1,0 +1,3 @@
+# Passes Lint (no free variables) but fails at runtime: division by zero.
+D0Elet("zero", D0Eint(0),
+       D0Eop2("/", D0Eint(1), D0Evar("zero")))

@@ -1,0 +1,12 @@
+# Passes Lint, but naive fib(40) needs hundreds of millions of steps.
+# Interpret is stopped by the timeout and reports a backend failure;
+# the source is kept so you can edit it (e.g. change 40 to 15) and retry.
+D0Eapp(
+    D0Efix("fib", "n",
+        D0Eif0(
+            D0Eop2("<", D0Evar("n"), D0Eint(2)),
+            D0Evar("n"),
+            D0Eop2("+",
+                D0Eapp(D0Evar("fib"), D0Eop2("-", D0Evar("n"), D0Eint(1))),
+                D0Eapp(D0Evar("fib"), D0Eop2("-", D0Evar("n"), D0Eint(2)))))),
+    D0Eint(40))

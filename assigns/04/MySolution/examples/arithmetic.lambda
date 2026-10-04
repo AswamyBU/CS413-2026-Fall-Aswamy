@@ -1,0 +1,2 @@
+# Expected Interpret result: D0Vint(arg1=42)
+D0Eop2("+", D0Eint(20), D0Eint(22))

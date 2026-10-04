@@ -1,0 +1,2 @@
+# Input error: not a d0exp constructor expression (unknown constructor / code).
+__import__("os").system("echo hacked")
