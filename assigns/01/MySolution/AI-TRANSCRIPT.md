@@ -20,7 +20,7 @@ the original as closely as possible.
 
 2. Can you walk me through the program, show me what happens at each step? 
 
-No follow-up prompts were needed to correct the translation itself. The first generated version compiled the expected behavior on the first run, so the remaining interaction was only about producing this transcript and working on test cases.
+No follow-up prompts were needed to correct the translation itself. The first generated version compiled the expected behavior on the first run, so the remaining interaction was only about producing this transcript.
 
 ## Significant decisions / corrections suggested by the AI
 
