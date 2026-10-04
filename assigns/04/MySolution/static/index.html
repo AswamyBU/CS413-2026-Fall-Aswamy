@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LAMBDA Workbench</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <h1>LAMBDA Workbench</h1>
+    <p id="status" role="status" aria-live="polite">Loading…</p>
+  </header>
+
+  <main>
+    <section aria-labelledby="source-heading">
+      <h2 id="source-heading">Source</h2>
+
+      <div class="row">
+        <label for="source-menu">Load source</label>
+        <select id="source-menu">
+          <option value="file">Choose File…</option>
+          <option value="manual">Manual input</option>
+          <option value="factorial">Factorial (canned)</option>
+          <option value="fibonacci">Fibonacci (canned)</option>
+        </select>
+        <button id="load-button" type="button">Load</button>
+        <input id="file-input" type="file" aria-label="Source file to upload" accept=".lambda,.txt,.py,text/plain" hidden>
+      </div>
+
+      <p id="source-info">No source applied.</p>
+
+      <label for="editor">Editor (one d0exp constructor expression; # comments allowed)</label>
+      <textarea id="editor" rows="14" spellcheck="false" autocomplete="off"></textarea>
+
+      <div class="row">
+        <button id="apply-button" type="button">Apply changes</button>
+        <button id="discard-button" type="button">Discard changes</button>
+        <span id="dirty-info"></span>
+      </div>
+      <p id="notice" aria-live="polite"></p>
+    </section>
+
+    <section aria-labelledby="actions-heading">
+      <h2 id="actions-heading">Actions</h2>
+      <div id="actions" class="row" role="group" aria-label="Language tools"></div>
+      <ul id="action-reasons"></ul>
+    </section>
+
+    <section aria-labelledby="results-heading">
+      <h2 id="results-heading">Results</h2>
+      <ol id="results"></ol>
+    </section>
+  </main>
+
+  <script src="/static/view.js"></script>
+</body>
+</html>
