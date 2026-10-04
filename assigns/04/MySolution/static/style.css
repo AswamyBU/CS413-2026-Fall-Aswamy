@@ -1,0 +1,53 @@
+:root {
+  --bg: #ffffff;
+  --fg: #1d1d1f;
+  --muted: #5a5a60;
+  --border: #c9c9cf;
+  --ok: #1b6e3a;
+  --err: #a31515;
+  --warn: #7a5300;
+  --panel: #f5f5f7;
+  --focus: #1a5fd0;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #18181b; --fg: #ececf0; --muted: #a8a8b0; --border: #44444c;
+    --ok: #6fd394; --err: #ff8a80; --warn: #f2c66d; --panel: #232328; --focus: #7aa7ff;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0 auto; max-width: 60rem; padding: 1rem;
+  font: 16px/1.45 system-ui, sans-serif; background: var(--bg); color: var(--fg);
+}
+h1 { margin: 0 0 .25rem; font-size: 1.5rem; }
+h2 { font-size: 1.15rem; margin: 1.5rem 0 .5rem; }
+.row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin: .5rem 0; }
+label { font-weight: 600; }
+textarea, pre {
+  font: 14px/1.4 ui-monospace, Consolas, monospace;
+}
+textarea {
+  display: block; width: 100%; margin-top: .25rem; padding: .5rem;
+  background: var(--panel); color: var(--fg); border: 1px solid var(--border); border-radius: 4px;
+}
+textarea[readonly] { opacity: .7; }
+button, select {
+  font: inherit; padding: .35rem .8rem; border-radius: 4px;
+  border: 1px solid var(--border); background: var(--panel); color: var(--fg); cursor: pointer;
+}
+button:disabled, select:disabled { opacity: .5; cursor: not-allowed; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+#status { margin: 0; font-weight: 600; }
+#source-info, #dirty-info, #action-reasons { color: var(--muted); }
+#action-reasons { margin: .25rem 0; padding-left: 1.25rem; font-size: .9rem; }
+.notice.error { color: var(--err); font-weight: 600; }
+#results { list-style: none; padding: 0; }
+.result { border: 1px solid var(--border); border-left-width: 6px; border-radius: 4px;
+          padding: .5rem .75rem; margin: .5rem 0; background: var(--panel); }
+.result.ok { border-left-color: var(--ok); }
+.result.input_error, .result.language_error, .result.backend_failure { border-left-color: var(--err); }
+.result.not_implemented, .result.unavailable { border-left-color: var(--warn); }
+.result-head { margin: 0; font-weight: 600; }
+pre { margin: .5rem 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.empty { color: var(--muted); }
