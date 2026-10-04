@@ -1,0 +1,2 @@
+# Lint lists the free variable "<b>bold</b>" literally; it must not render as HTML.
+D0Evar("<b>bold</b>")

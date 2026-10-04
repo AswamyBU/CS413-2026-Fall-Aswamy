@@ -1,0 +1,4 @@
+# Lint error: undeclared variables x and y (x appears twice, reported once).
+# The let binds "z" only in its body, so the z in its initializer is free too.
+D0Elet("z", D0Eop2("+", D0Evar("z"), D0Evar("x")),
+       D0Eop2("*", D0Evar("x"), D0Evar("y")))

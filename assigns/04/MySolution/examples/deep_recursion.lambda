@@ -1,0 +1,5 @@
+# Passes Lint, never finishes logically: loop(n) = loop(n + 1).
+# The evaluator is not tail-recursive, so Interpret reports a runtime error
+# ("recursion too deep") instead of running forever.
+D0Eapp(D0Efix("loop", "n", D0Eapp(D0Evar("loop"), D0Eop2("+", D0Evar("n"), D0Eint(1)))),
+       D0Eint(0))
