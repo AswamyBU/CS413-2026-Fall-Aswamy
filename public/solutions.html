@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Assignment solutions for Boston University CAS CS 413: (Agentic) Software Engineering, Fall 2026.">
+  <title>Assignment solutions · BU CAS CS 413 · Fall 2026</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .password-controls { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: .5rem; }
+    .password-controls input { min-width: 0; max-width: 100%; padding: .65rem; font: inherit; border: 1px solid #777; border-radius: .3rem; }
+    .password-controls button { padding: .65rem 1.2rem; font: inherit; background: #a60000; color: white; border: 0; border-radius: .3rem; cursor: pointer; }
+    .password-controls button:disabled { opacity: .6; cursor: wait; }
+    .password-controls :focus-visible { outline: 3px solid #1765ab; outline-offset: 3px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <p class="eyebrow">Boston University · College of Arts &amp; Sciences</p>
+      <h1>Assignment solutions</h1>
+      <p class="subtitle">CAS CS 413 · (Agentic) Software Engineering</p>
+      <p>Fall 2026</p>
+    </div>
+  </header>
+  <main class="container">
+    <nav aria-label="Course navigation"><p><a href="index.html">← Course homepage</a></p></nav>
+    <section aria-labelledby="unlock-heading">
+      <h2 id="unlock-heading">Enter the class password</h2>
+      <form id="unlock-form">
+        <label for="password">Password</label>
+        <div class="password-controls">
+          <input id="password" name="password" type="password" autocomplete="current-password" required aria-describedby="unlock-status">
+          <button type="submit">Unlock</button>
+        </div>
+        <p id="unlock-status" role="status" aria-live="polite"></p>
+      </form>
+      <noscript>JavaScript is required to unlock this page.</noscript>
+    </section>
+  </main>
+  <footer class="container">BU CAS CS 413 · Fall 2026</footer>
+
+<script>
+'use strict';
+// Only encrypted page content is published. The password is not stored here.
+const protectedContent = {"salt": "vT7GRV0D/cjv+jvnJGV2Bg==", "iv": "6j+ZZhiZzNc1CSyD", "ciphertext": "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"};
+async function decryptContent(password) {
+  const decode = value => Uint8Array.from(atob(value), c => c.charCodeAt(0));
+  const material = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
+  const key = await crypto.subtle.deriveKey({name:'PBKDF2', salt:decode(protectedContent.salt), iterations:600000, hash:'SHA-256'}, material, {name:'AES-GCM', length:256}, false, ['decrypt']);
+  const plaintext = await crypto.subtle.decrypt({name:'AES-GCM', iv:decode(protectedContent.iv)}, key, decode(protectedContent.ciphertext));
+  return new TextDecoder().decode(plaintext);
+}
+const form = document.getElementById('unlock-form');
+form.addEventListener('submit', async event => {
+  event.preventDefault();
+  const status = document.getElementById('unlock-status');
+  const input = document.getElementById('password');
+  const button = form.querySelector('button');
+  if (!globalThis.crypto?.subtle) {
+    status.textContent = 'Please open this page over HTTPS or through a local server to unlock it.';
+    return;
+  }
+  button.disabled = true;
+  status.textContent = 'Unlocking…';
+  try {
+    const content = await decryptContent(input.value);
+    input.value = '';
+    const main = document.querySelector('main');
+    main.innerHTML = content;
+    const heading = main.querySelector('h2');
+    heading.setAttribute('tabindex', '-1');
+    heading.focus();
+  } catch {
+    status.textContent = 'Incorrect password. Please try again.';
+    input.select();
+  } finally {
+    button.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

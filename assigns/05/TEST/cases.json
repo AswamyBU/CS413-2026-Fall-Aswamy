@@ -1,0 +1,1587 @@
+[
+  {
+    "name": "integer",
+    "expr": [
+      "int",
+      "42"
+    ],
+    "fv": [],
+    "value": [
+      "int",
+      "42"
+    ]
+  },
+  {
+    "name": "boolean",
+    "expr": [
+      "btf",
+      false
+    ],
+    "fv": [],
+    "value": [
+      "btf",
+      false
+    ]
+  },
+  {
+    "name": "unbound variable sentinel",
+    "expr": [
+      "var",
+      "missing"
+    ],
+    "fv": [
+      "missing"
+    ],
+    "value": [
+      "unknown"
+    ]
+  },
+  {
+    "name": "arithmetic +",
+    "expr": [
+      "op2",
+      "+",
+      [
+        "int",
+        "7"
+      ],
+      [
+        "int",
+        "3"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "int",
+      "10"
+    ]
+  },
+  {
+    "name": "arithmetic -",
+    "expr": [
+      "op2",
+      "-",
+      [
+        "int",
+        "7"
+      ],
+      [
+        "int",
+        "3"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "int",
+      "4"
+    ]
+  },
+  {
+    "name": "arithmetic *",
+    "expr": [
+      "op2",
+      "*",
+      [
+        "int",
+        "7"
+      ],
+      [
+        "int",
+        "3"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "int",
+      "21"
+    ]
+  },
+  {
+    "name": "arithmetic /",
+    "expr": [
+      "op2",
+      "/",
+      [
+        "int",
+        "7"
+      ],
+      [
+        "int",
+        "3"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "int",
+      "2"
+    ]
+  },
+  {
+    "name": "floor division -7/3",
+    "expr": [
+      "op2",
+      "/",
+      [
+        "int",
+        "-7"
+      ],
+      [
+        "int",
+        "3"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "int",
+      "-3"
+    ]
+  },
+  {
+    "name": "floor division 7/-3",
+    "expr": [
+      "op2",
+      "/",
+      [
+        "int",
+        "7"
+      ],
+      [
+        "int",
+        "-3"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "int",
+      "-3"
+    ]
+  },
+  {
+    "name": "floor division -7/-3",
+    "expr": [
+      "op2",
+      "/",
+      [
+        "int",
+        "-7"
+      ],
+      [
+        "int",
+        "-3"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "int",
+      "2"
+    ]
+  },
+  {
+    "name": "floor division -6/3",
+    "expr": [
+      "op2",
+      "/",
+      [
+        "int",
+        "-6"
+      ],
+      [
+        "int",
+        "3"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "int",
+      "-2"
+    ]
+  },
+  {
+    "name": "floor division 0/-3",
+    "expr": [
+      "op2",
+      "/",
+      [
+        "int",
+        "0"
+      ],
+      [
+        "int",
+        "-3"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "int",
+      "0"
+    ]
+  },
+  {
+    "name": "arbitrary precision",
+    "expr": [
+      "op2",
+      "*",
+      [
+        "int",
+        "100000000000000000000"
+      ],
+      [
+        "int",
+        "100000000000000000000"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "int",
+      "10000000000000000000000000000000000000000"
+    ]
+  },
+  {
+    "name": "comparison 2<3",
+    "expr": [
+      "op2",
+      "<",
+      [
+        "int",
+        "2"
+      ],
+      [
+        "int",
+        "3"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "btf",
+      true
+    ]
+  },
+  {
+    "name": "comparison 3<3",
+    "expr": [
+      "op2",
+      "<",
+      [
+        "int",
+        "3"
+      ],
+      [
+        "int",
+        "3"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "btf",
+      false
+    ]
+  },
+  {
+    "name": "comparison 4<3",
+    "expr": [
+      "op2",
+      "<",
+      [
+        "int",
+        "4"
+      ],
+      [
+        "int",
+        "3"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "btf",
+      false
+    ]
+  },
+  {
+    "name": "comparison 2>3",
+    "expr": [
+      "op2",
+      ">",
+      [
+        "int",
+        "2"
+      ],
+      [
+        "int",
+        "3"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "btf",
+      false
+    ]
+  },
+  {
+    "name": "comparison 3>3",
+    "expr": [
+      "op2",
+      ">",
+      [
+        "int",
+        "3"
+      ],
+      [
+        "int",
+        "3"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "btf",
+      false
+    ]
+  },
+  {
+    "name": "comparison 4>3",
+    "expr": [
+      "op2",
+      ">",
+      [
+        "int",
+        "4"
+      ],
+      [
+        "int",
+        "3"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "btf",
+      true
+    ]
+  },
+  {
+    "name": "comparison 2<=3",
+    "expr": [
+      "op2",
+      "<=",
+      [
+        "int",
+        "2"
+      ],
+      [
+        "int",
+        "3"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "btf",
+      true
+    ]
+  },
+  {
+    "name": "comparison 3<=3",
+    "expr": [
+      "op2",
+      "<=",
+      [
+        "int",
+        "3"
+      ],
+      [
+        "int",
+        "3"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "btf",
+      true
+    ]
+  },
+  {
+    "name": "comparison 4<=3",
+    "expr": [
+      "op2",
+      "<=",
+      [
+        "int",
+        "4"
+      ],
+      [
+        "int",
+        "3"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "btf",
+      false
+    ]
+  },
+  {
+    "name": "comparison 2>=3",
+    "expr": [
+      "op2",
+      ">=",
+      [
+        "int",
+        "2"
+      ],
+      [
+        "int",
+        "3"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "btf",
+      false
+    ]
+  },
+  {
+    "name": "comparison 3>=3",
+    "expr": [
+      "op2",
+      ">=",
+      [
+        "int",
+        "3"
+      ],
+      [
+        "int",
+        "3"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "btf",
+      true
+    ]
+  },
+  {
+    "name": "comparison 4>=3",
+    "expr": [
+      "op2",
+      ">=",
+      [
+        "int",
+        "4"
+      ],
+      [
+        "int",
+        "3"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "btf",
+      true
+    ]
+  },
+  {
+    "name": "comparison 2==3",
+    "expr": [
+      "op2",
+      "==",
+      [
+        "int",
+        "2"
+      ],
+      [
+        "int",
+        "3"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "btf",
+      false
+    ]
+  },
+  {
+    "name": "comparison 3==3",
+    "expr": [
+      "op2",
+      "==",
+      [
+        "int",
+        "3"
+      ],
+      [
+        "int",
+        "3"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "btf",
+      true
+    ]
+  },
+  {
+    "name": "comparison 4==3",
+    "expr": [
+      "op2",
+      "==",
+      [
+        "int",
+        "4"
+      ],
+      [
+        "int",
+        "3"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "btf",
+      false
+    ]
+  },
+  {
+    "name": "comparison 2!=3",
+    "expr": [
+      "op2",
+      "!=",
+      [
+        "int",
+        "2"
+      ],
+      [
+        "int",
+        "3"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "btf",
+      true
+    ]
+  },
+  {
+    "name": "comparison 3!=3",
+    "expr": [
+      "op2",
+      "!=",
+      [
+        "int",
+        "3"
+      ],
+      [
+        "int",
+        "3"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "btf",
+      false
+    ]
+  },
+  {
+    "name": "comparison 4!=3",
+    "expr": [
+      "op2",
+      "!=",
+      [
+        "int",
+        "4"
+      ],
+      [
+        "int",
+        "3"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "btf",
+      true
+    ]
+  },
+  {
+    "name": "unary +1",
+    "expr": [
+      "op1",
+      "+1",
+      [
+        "int",
+        "5"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "int",
+      "6"
+    ]
+  },
+  {
+    "name": "unary -1",
+    "expr": [
+      "op1",
+      "-1",
+      [
+        "int",
+        "5"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "int",
+      "4"
+    ]
+  },
+  {
+    "name": "conditional selects True",
+    "expr": [
+      "if0",
+      [
+        "btf",
+        true
+      ],
+      [
+        "int",
+        "9"
+      ],
+      [
+        "op2",
+        "/",
+        [
+          "int",
+          "1"
+        ],
+        [
+          "int",
+          "0"
+        ]
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "int",
+      "9"
+    ]
+  },
+  {
+    "name": "conditional selects False",
+    "expr": [
+      "if0",
+      [
+        "btf",
+        false
+      ],
+      [
+        "op2",
+        "/",
+        [
+          "int",
+          "1"
+        ],
+        [
+          "int",
+          "0"
+        ]
+      ],
+      [
+        "int",
+        "9"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "int",
+      "9"
+    ]
+  },
+  {
+    "name": "let initializer sees outer binding",
+    "expr": [
+      "let",
+      "x",
+      [
+        "int",
+        "10"
+      ],
+      [
+        "let",
+        "x",
+        [
+          "op2",
+          "+",
+          [
+            "var",
+            "x"
+          ],
+          [
+            "int",
+            "1"
+          ]
+        ],
+        [
+          "var",
+          "x"
+        ]
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "int",
+      "11"
+    ]
+  },
+  {
+    "name": "lambda captures lexical scope",
+    "expr": [
+      "let",
+      "x",
+      [
+        "int",
+        "10"
+      ],
+      [
+        "let",
+        "f",
+        [
+          "lam",
+          "y",
+          [
+            "op2",
+            "+",
+            [
+              "var",
+              "x"
+            ],
+            [
+              "var",
+              "y"
+            ]
+          ]
+        ],
+        [
+          "let",
+          "x",
+          [
+            "int",
+            "99"
+          ],
+          [
+            "app",
+            [
+              "var",
+              "f"
+            ],
+            [
+              "int",
+              "2"
+            ]
+          ]
+        ]
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "int",
+      "12"
+    ]
+  },
+  {
+    "name": "higher order closure",
+    "expr": [
+      "app",
+      [
+        "app",
+        [
+          "lam",
+          "x",
+          [
+            "lam",
+            "y",
+            [
+              "op2",
+              "+",
+              [
+                "var",
+                "x"
+              ],
+              [
+                "var",
+                "y"
+              ]
+            ]
+          ]
+        ],
+        [
+          "int",
+          "7"
+        ]
+      ],
+      [
+        "int",
+        "8"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "int",
+      "15"
+    ]
+  },
+  {
+    "name": "recursive factorial",
+    "expr": [
+      "app",
+      [
+        "fix",
+        "fact",
+        "n",
+        [
+          "if0",
+          [
+            "op2",
+            "<=",
+            [
+              "var",
+              "n"
+            ],
+            [
+              "int",
+              "1"
+            ]
+          ],
+          [
+            "int",
+            "1"
+          ],
+          [
+            "op2",
+            "*",
+            [
+              "var",
+              "n"
+            ],
+            [
+              "app",
+              [
+                "var",
+                "fact"
+              ],
+              [
+                "op1",
+                "-1",
+                [
+                  "var",
+                  "n"
+                ]
+              ]
+            ]
+          ]
+        ]
+      ],
+      [
+        "int",
+        "6"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "int",
+      "720"
+    ]
+  },
+  {
+    "name": "fix parameter shadows own name",
+    "expr": [
+      "app",
+      [
+        "fix",
+        "x",
+        "x",
+        [
+          "var",
+          "x"
+        ]
+      ],
+      [
+        "int",
+        "7"
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "int",
+      "7"
+    ]
+  },
+  {
+    "name": "fix captures lexical scope",
+    "expr": [
+      "let",
+      "x",
+      [
+        "int",
+        "10"
+      ],
+      [
+        "let",
+        "f",
+        [
+          "fix",
+          "f",
+          "n",
+          [
+            "if0",
+            [
+              "op2",
+              "==",
+              [
+                "var",
+                "n"
+              ],
+              [
+                "int",
+                "0"
+              ]
+            ],
+            [
+              "var",
+              "x"
+            ],
+            [
+              "app",
+              [
+                "var",
+                "f"
+              ],
+              [
+                "op1",
+                "-1",
+                [
+                  "var",
+                  "n"
+                ]
+              ]
+            ]
+          ]
+        ],
+        [
+          "let",
+          "x",
+          [
+            "int",
+            "99"
+          ],
+          [
+            "app",
+            [
+              "var",
+              "f"
+            ],
+            [
+              "int",
+              "3"
+            ]
+          ]
+        ]
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "int",
+      "10"
+    ]
+  },
+  {
+    "name": "nested pair",
+    "expr": [
+      "pair",
+      [
+        "int",
+        "1"
+      ],
+      [
+        "pair",
+        [
+          "btf",
+          true
+        ],
+        [
+          "int",
+          "2"
+        ]
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "pair",
+      [
+        "int",
+        "1"
+      ],
+      [
+        "pair",
+        [
+          "btf",
+          true
+        ],
+        [
+          "int",
+          "2"
+        ]
+      ]
+    ]
+  },
+  {
+    "name": "pfst",
+    "expr": [
+      "pfst",
+      [
+        "pair",
+        [
+          "int",
+          "1"
+        ],
+        [
+          "btf",
+          true
+        ]
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "int",
+      "1"
+    ]
+  },
+  {
+    "name": "psnd",
+    "expr": [
+      "psnd",
+      [
+        "pair",
+        [
+          "int",
+          "1"
+        ],
+        [
+          "btf",
+          true
+        ]
+      ]
+    ],
+    "fv": [],
+    "value": [
+      "btf",
+      true
+    ]
+  },
+  {
+    "name": "argument is eager",
+    "expr": [
+      "app",
+      [
+        "lam",
+        "x",
+        [
+          "int",
+          "1"
+        ]
+      ],
+      [
+        "op2",
+        "/",
+        [
+          "int",
+          "1"
+        ],
+        [
+          "int",
+          "0"
+        ]
+      ]
+    ],
+    "fv": [],
+    "error": "division"
+  },
+  {
+    "name": "let initializer is eager",
+    "expr": [
+      "let",
+      "x",
+      [
+        "op2",
+        "/",
+        [
+          "int",
+          "1"
+        ],
+        [
+          "int",
+          "0"
+        ]
+      ],
+      [
+        "int",
+        "1"
+      ]
+    ],
+    "fv": [],
+    "error": "division"
+  },
+  {
+    "name": "pair second is eager",
+    "expr": [
+      "pfst",
+      [
+        "pair",
+        [
+          "int",
+          "1"
+        ],
+        [
+          "op2",
+          "/",
+          [
+            "int",
+            "1"
+          ],
+          [
+            "int",
+            "0"
+          ]
+        ]
+      ]
+    ],
+    "fv": [],
+    "error": "division"
+  },
+  {
+    "name": "division by zero",
+    "expr": [
+      "op2",
+      "/",
+      [
+        "int",
+        "1"
+      ],
+      [
+        "int",
+        "0"
+      ]
+    ],
+    "fv": [],
+    "error": "division"
+  },
+  {
+    "name": "condition requires boolean",
+    "expr": [
+      "if0",
+      [
+        "int",
+        "1"
+      ],
+      [
+        "int",
+        "2"
+      ],
+      [
+        "int",
+        "3"
+      ]
+    ],
+    "fv": [],
+    "error": "type"
+  },
+  {
+    "name": "application requires closure",
+    "expr": [
+      "app",
+      [
+        "int",
+        "1"
+      ],
+      [
+        "int",
+        "2"
+      ]
+    ],
+    "fv": [],
+    "error": "type"
+  },
+  {
+    "name": "first requires pair",
+    "expr": [
+      "pfst",
+      [
+        "int",
+        "1"
+      ]
+    ],
+    "fv": [],
+    "error": "type"
+  },
+  {
+    "name": "second requires pair",
+    "expr": [
+      "psnd",
+      [
+        "int",
+        "1"
+      ]
+    ],
+    "fv": [],
+    "error": "type"
+  },
+  {
+    "name": "unary requires integer",
+    "expr": [
+      "op1",
+      "+1",
+      [
+        "btf",
+        true
+      ]
+    ],
+    "fv": [],
+    "error": "type"
+  },
+  {
+    "name": "unknown unary",
+    "expr": [
+      "op1",
+      "?",
+      [
+        "int",
+        "1"
+      ]
+    ],
+    "fv": [],
+    "error": "type"
+  },
+  {
+    "name": "unknown binary",
+    "expr": [
+      "op2",
+      "?",
+      [
+        "int",
+        "1"
+      ],
+      [
+        "int",
+        "2"
+      ]
+    ],
+    "fv": [],
+    "error": "type"
+  },
+  {
+    "name": "left requires integer",
+    "expr": [
+      "op2",
+      "+",
+      [
+        "btf",
+        true
+      ],
+      [
+        "int",
+        "2"
+      ]
+    ],
+    "fv": [],
+    "error": "type"
+  },
+  {
+    "name": "right requires integer",
+    "expr": [
+      "op2",
+      "+",
+      [
+        "int",
+        "1"
+      ],
+      [
+        "btf",
+        true
+      ]
+    ],
+    "fv": [],
+    "error": "type"
+  },
+  {
+    "name": "pair left before right",
+    "expr": [
+      "pair",
+      [
+        "pfst",
+        [
+          "int",
+          "0"
+        ]
+      ],
+      [
+        "op2",
+        "/",
+        [
+          "int",
+          "1"
+        ],
+        [
+          "int",
+          "0"
+        ]
+      ]
+    ],
+    "fv": [],
+    "error": "type"
+  },
+  {
+    "name": "operator left before right",
+    "expr": [
+      "op2",
+      "+",
+      [
+        "pfst",
+        [
+          "int",
+          "0"
+        ]
+      ],
+      [
+        "op2",
+        "/",
+        [
+          "int",
+          "1"
+        ],
+        [
+          "int",
+          "0"
+        ]
+      ]
+    ],
+    "fv": [],
+    "error": "type"
+  },
+  {
+    "name": "function before argument",
+    "expr": [
+      "app",
+      [
+        "pfst",
+        [
+          "int",
+          "0"
+        ]
+      ],
+      [
+        "op2",
+        "/",
+        [
+          "int",
+          "1"
+        ],
+        [
+          "int",
+          "0"
+        ]
+      ]
+    ],
+    "fv": [],
+    "error": "type"
+  },
+  {
+    "name": "argument before application type check",
+    "expr": [
+      "app",
+      [
+        "int",
+        "0"
+      ],
+      [
+        "op2",
+        "/",
+        [
+          "int",
+          "1"
+        ],
+        [
+          "int",
+          "0"
+        ]
+      ]
+    ],
+    "fv": [],
+    "error": "division"
+  },
+  {
+    "name": "lambda binding",
+    "expr": [
+      "lam",
+      "x",
+      [
+        "op2",
+        "+",
+        [
+          "var",
+          "x"
+        ],
+        [
+          "var",
+          "y"
+        ]
+      ]
+    ],
+    "fv": [
+      "y"
+    ]
+  },
+  {
+    "name": "fix bindings",
+    "expr": [
+      "fix",
+      "f",
+      "x",
+      [
+        "pair",
+        [
+          "app",
+          [
+            "var",
+            "f"
+          ],
+          [
+            "var",
+            "x"
+          ]
+        ],
+        [
+          "var",
+          "z"
+        ]
+      ]
+    ],
+    "fv": [
+      "z"
+    ]
+  },
+  {
+    "name": "let initializer remains free",
+    "expr": [
+      "let",
+      "x",
+      [
+        "var",
+        "x"
+      ],
+      [
+        "pair",
+        [
+          "var",
+          "x"
+        ],
+        [
+          "var",
+          "y"
+        ]
+      ]
+    ],
+    "fv": [
+      "x",
+      "y"
+    ]
+  },
+  {
+    "name": "if visits all branches",
+    "expr": [
+      "if0",
+      [
+        "var",
+        "c"
+      ],
+      [
+        "var",
+        "x"
+      ],
+      [
+        "var",
+        "y"
+      ]
+    ],
+    "fv": [
+      "c",
+      "x",
+      "y"
+    ]
+  },
+  {
+    "name": "unary free variables",
+    "expr": [
+      "op1",
+      "+1",
+      [
+        "var",
+        "x"
+      ]
+    ],
+    "fv": [
+      "x"
+    ]
+  },
+  {
+    "name": "first free variables",
+    "expr": [
+      "pfst",
+      [
+        "var",
+        "p"
+      ]
+    ],
+    "fv": [
+      "p"
+    ]
+  },
+  {
+    "name": "second free variables",
+    "expr": [
+      "psnd",
+      [
+        "var",
+        "p"
+      ]
+    ],
+    "fv": [
+      "p"
+    ]
+  },
+  {
+    "name": "duplicate names collapse",
+    "expr": [
+      "pair",
+      [
+        "var",
+        "x"
+      ],
+      [
+        "var",
+        "x"
+      ]
+    ],
+    "fv": [
+      "x"
+    ]
+  },
+  {
+    "name": "free analysis does not evaluate",
+    "expr": [
+      "op2",
+      "/",
+      [
+        "int",
+        "1"
+      ],
+      [
+        "int",
+        "0"
+      ]
+    ],
+    "fv": []
+  }
+]

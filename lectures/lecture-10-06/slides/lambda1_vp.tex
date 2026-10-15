@@ -1,0 +1,403 @@
+\documentclass[aspectratio=169,11pt]{beamer}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{listings}
+\usepackage{booktabs}
+\definecolor{navy}{RGB}{25,48,76}
+\definecolor{teal}{RGB}{0,112,120}
+\definecolor{codebg}{RGB}{246,247,249}
+\setbeamercolor{structure}{fg=teal}
+\setbeamercolor{frametitle}{fg=navy}
+\setbeamercolor{title}{fg=navy}
+\setbeamercolor{normal text}{fg=navy,bg=white}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}{\hfill\usebeamercolor[fg]{structure}\insertframenumber\,/\,\inserttotalframenumber\hspace{5mm}\vspace{3mm}}
+\setbeamertemplate{itemize items}[circle]
+\setbeamersize{text margin left=9mm,text margin right=9mm}
+\lstset{language=Python,basicstyle=\ttfamily\small,keywordstyle=\color{teal}\bfseries,commentstyle=\color{gray},stringstyle=\color{teal},backgroundcolor=\color{codebg},frame=none,showstringspaces=false,columns=fullflexible,keepspaces=true,breaklines=true,xleftmargin=2mm,xrightmargin=2mm,aboveskip=8pt,belowskip=8pt}
+\newcommand{\code}[1]{\texttt{#1}}
+\title{The Visitor Pattern}
+\subtitle{A lambda-calculus interpreter in Python}
+\author{CS413}
+\date{Fall 2026}
+\begin{document}
+\begin{frame}\titlepage\end{frame}
+
+\begin{frame}{Why use a visitor?}
+An expression tree supports several operations:
+\begin{itemize}
+\item Evaluate the expression to obtain a value.
+\item Compute its free variables.
+\item Other possible operations include printing or type checking.
+\end{itemize}
+\medskip
+Each operation needs a case for every kind of expression.
+\medskip
+
+\alert{Visitor groups the cases for one operation in one object.}
+The expression classes store syntax and provide an \code{accept} method.
+\end{frame}
+
+\begin{frame}{The roles in the Visitor Pattern}
+\renewcommand{\arraystretch}{1.5}
+\begin{tabular}{p{.25\textwidth}p{.65\textwidth}}
+\toprule
+Role & In this interpreter \\
+\midrule
+Element & An expression node, such as \code{D0Eint} \\
+\code{accept(visitor)} & Calls the visitor method for that node's form \\
+Visitor interface & \code{D0ExpVisitor[R]} declares one method per form \\
+Concrete visitor & \code{EvaluateVisitor} or \code{FreeVariableVisitor} \\
+Client & Calls \code{expr.accept(visitor)} and uses the result \\
+\bottomrule
+\end{tabular}
+\end{frame}
+
+\begin{frame}[fragile]{A node delegates to the visitor}
+\begin{lstlisting}
+@dataclass
+class D0Eint(D0E000):
+    arg1: sint
+
+    def accept[R](self, visitor: D0ExpVisitor[R]) -> R:
+        return visitor.visit_int(self)
+\end{lstlisting}
+\begin{itemize}
+\item The node knows that it is an integer expression.
+\item It passes itself to \code{visit\_int}, so the visitor can read \code{arg1}.
+\item The supplied visitor determines what to do with that integer.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{One node, two operations}
+\begin{lstlisting}
+# In EvaluateVisitor:
+def visit_int(self, dexp: D0Eint) -> d0val:
+    return D0Vint(dexp.arg1)
+
+# In FreeVariableVisitor:
+def visit_int(self, dexp: D0Eint) -> frozenset[dvar]:
+    return frozenset()
+\end{lstlisting}
+\begin{lstlisting}
+expr = D0Eint(7)
+expr.accept(EvaluateVisitor())      # D0Vint(7)
+expr.accept(FreeVariableVisitor())  # frozenset()
+\end{lstlisting}
+The expression stays the same. The visitor selects the operation.
+\end{frame}
+
+\begin{frame}{How dispatch works}
+For \code{expr = D0Eint(7)} and \code{v = EvaluateVisitor()}:
+\begin{enumerate}
+\item The client calls \code{expr.accept(v)}.
+\item Python finds \code{accept} on \code{D0Eint}.
+\item That method calls \code{v.visit\_int(expr)}.
+\item Python finds \code{visit\_int} on \code{EvaluateVisitor}.
+\item The visitor returns \code{D0Vint(7)} through \code{accept}.
+\end{enumerate}
+\medskip
+The behavior depends on both the node class and the visitor class.
+This is the Visitor Pattern's \alert{double dispatch}.
+\medskip
+
+Here, explicit method names such as \code{visit\_int} encode the node case.
+\end{frame}
+
+\begin{frame}[fragile]{The visitor controls recursive traversal}
+\begin{lstlisting}
+# In FreeVariableVisitor:
+def visit_op2(self, dexp: D0Eop2) -> frozenset[dvar]:
+    return dexp.arg1.accept(self) | dexp.arg2.accept(self)
+\end{lstlisting}
+For \code{D0Eop2("+", D0Evar("x"), D0Eint(1))}:
+\begin{enumerate}
+\item The root dispatches to \code{visit\_op2}.
+\item The visitor visits the left child, obtaining \code{\{"x"\}}.
+\item It visits the right child, obtaining the empty set.
+\item It returns their union, \code{frozenset(\{"x"\})}.
+\end{enumerate}
+\medskip
+\code{accept} dispatches one node. Visitor methods decide which children to visit.
+\end{frame}
+
+\begin{frame}{The extension tradeoff}
+\textbf{Adding an operation}\par
+Create a new visitor and implement its cases. Existing expression classes
+and existing visitors can stay unchanged.
+\bigskip
+
+\textbf{Adding an expression form}\par
+Add the node class and its \code{accept} method, extend the visitor interface,
+and add the new case to every concrete visitor.
+\bigskip
+
+Visitor is useful when the node forms are relatively stable and new
+operations are common.
+\end{frame}
+
+\begin{frame}[fragile]{The visitor result type}
+\begin{lstlisting}
+class D0ExpVisitor[R](ABC):
+    @abstractmethod
+    def visit_int(self, dexp: D0Eint) -> R:
+        raise NotImplementedError
+    # One abstract method for each expression form.
+\end{lstlisting}
+\begin{itemize}
+\item \code{EvaluateVisitor}: \code{R = d0val}.
+\item \code{FreeVariableVisitor}: \code{R = frozenset[dvar]}.
+\item Each \code{accept[R]} has a local type parameter linking the visitor's result type to its own return type.
+\end{itemize}
+This source requires Python 3.12 or later. Annotations support static checking.
+Abstract methods require concrete visitors to implement every case.
+\end{frame}
+
+\begin{frame}[fragile]{The interpreter's public operations}
+\begin{lstlisting}
+def d0exp_fvset(dexp: d0exp) -> frozenset[dvar]:
+    return dexp.accept(FreeVariableVisitor())
+
+def d0exp_evaluate(dexp: d0exp,
+                   denv: d0env = ENVnil()) -> d0val:
+    return dexp.accept(EvaluateVisitor(denv))
+\end{lstlisting}
+Expressions describe programs. Values describe results.
+Environments bind names to values.
+\medskip
+
+The interpreter builds syntax with constructors. It does not include a parser.
+\end{frame}
+
+\begin{frame}[fragile]{Expression constructors}
+\begin{itemize}
+\item Constants and operators: \code{D0Eint}, \code{D0Ebtf}, \code{D0Eop1}, \code{D0Eop2}.
+\item Variables and functions: \code{D0Evar}, \code{D0Elam}, \code{D0Efix}, \code{D0Eapp}.
+\item Binding and control: \code{D0Elet}, \code{D0Eif0}.
+\item Pairs: \code{D0Epair}, \code{D0Epfst}, \code{D0Epsnd}.
+\end{itemize}
+\begin{lstlisting}
+D0Eop2("+", D0Eint(2), D0Eint(3))  # syntax for 2 + 3
+D0Elam("x", D0Evar("x"))          # lambda x. x
+D0Efix("f", "x", body)            # fix f(x). body
+\end{lstlisting}
+The meaning of \code{arg1}, \code{arg2}, and \code{arg3} depends on the constructor.
+\end{frame}
+
+\begin{frame}{Free variables and lexical binding}
+A variable occurrence is free when no enclosing binder binds it.
+\begin{align*}
+\operatorname{FV}(x) &= \{x\} \\
+\operatorname{FV}(42) &= \varnothing \\
+\operatorname{FV}(\lambda x.\ e) &= \operatorname{FV}(e)\setminus\{x\} \\
+\operatorname{FV}(\mathrm{fix}\ f(x).\ e) &= \operatorname{FV}(e)\setminus\{f,x\} \\
+\operatorname{FV}(\mathrm{let}\ x=e_1\ \mathrm{in}\ e_2)
+ &= \operatorname{FV}(e_1)\cup(\operatorname{FV}(e_2)\setminus\{x\})
+\end{align*}
+Operators, application, and pairs combine their children's free names.
+A conditional includes names from its condition and both branches.
+\end{frame}
+
+\begin{frame}[fragile]{A let binder covers only its body}
+\begin{center}\Large \code{let x = x + 1 in x + y}\end{center}
+\begin{itemize}
+\item Initializer: free names are $\{x\}$.
+\item Body: free names are $\{x,y\}$ before accounting for the binder.
+\item Remove the bound $x$ from the body's set, then take the union.
+\end{itemize}
+\[
+\operatorname{FV} = \{x\}\cup(\{x,y\}\setminus\{x\}) = \{x,y\}
+\]
+\begin{lstlisting}
+def visit_let(self, dexp):
+    return (dexp.arg2.accept(self)
+            | (dexp.arg3.accept(self) - {dexp.arg1}))
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Environments and shadowing}
+\code{ENVnil()} is empty. \code{ENVcns(name, value, tail)} adds a binding.
+Lookup searches the newest binding first.
+\begin{lstlisting}
+old = ENVcns("x", D0Vint(1), ENVnil())
+new = ENVcns("x", D0Vint(2), old)
+
+d0env_search(new, "x")  # D0Vint(2)
+d0env_search(old, "x")  # D0Vint(1)
+\end{lstlisting}
+Frozen environment nodes preserve earlier scopes when a new node extends them.
+\medskip
+
+An unbound name returns \code{D0V000()}, the implementation's error sentinel.
+\end{frame}
+
+\begin{frame}[fragile]{Evaluating let introduces a new scope}
+\begin{lstlisting}
+def visit_let(self, dexp: D0Elet) -> d0val:
+    value = dexp.arg2.accept(self)
+    denv = ENVcns(dexp.arg1, value, self.denv)
+    return dexp.arg3.accept(EvaluateVisitor(denv))
+\end{lstlisting}
+\begin{enumerate}
+\item Evaluate the initializer in the current environment.
+\item Extend that environment with the new binding.
+\item Evaluate the body using a new visitor for the extended scope.
+\end{enumerate}
+The initializer cannot use the new binding. The caller's scope stays intact.
+\end{frame}
+
+\begin{frame}[fragile]{Values and closures}
+\code{D0Vint} and \code{D0Vbtf} hold scalar results.
+\code{D0Vpair} holds two evaluated values.
+\medskip
+
+A \alert{closure} stores a function expression together with its defining environment.
+\begin{lstlisting}
+def visit_lam(self, dexp):
+    return D0Vlam(self.denv, dexp)
+
+def visit_fix(self, dexp):
+    return D0Vfix(self.denv, dexp)
+\end{lstlisting}
+The body runs when the function is applied. This implementation captures the
+whole environment, without trimming it using free-variable analysis.
+\end{frame}
+
+\begin{frame}[fragile]{Function application uses call by value}
+\begin{lstlisting}
+dfun = dexp.arg1.accept(self)  # function in caller's scope
+darg = dexp.arg2.accept(self)  # argument in caller's scope
+
+# When dfun is a D0Vlam:
+dlam = dfun.arg2
+denv = ENVcns(dlam.arg1, darg, dfun.arg1)
+return dlam.arg2.accept(EvaluateVisitor(denv))
+\end{lstlisting}
+\begin{itemize}
+\item Evaluate the function, then the argument, even if the body ignores it.
+\item Bind the parameter in the \emph{closure's} environment.
+\item Evaluate the body in that extended environment.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Lexical scoping preserves the defining environment}
+Surface notation for a constructor-built expression:
+\begin{lstlisting}
+let x = 10 in
+let f = (lam y. x + y) in
+let x = 100 in
+f(1)
+\end{lstlisting}
+\begin{enumerate}
+\item Defining \code{f} captures the environment where \code{x = 10}.
+\item Calling \code{f(1)} binds \code{y = 1} in that saved environment.
+\item The body finds \code{x = 10} and \code{y = 1}.
+\end{enumerate}
+\medskip
+Result: \alert{\code{D0Vint(11)}}. The caller's \code{x = 100} does not replace the captured binding.
+\end{frame}
+
+\begin{frame}[fragile]{Recursive closures bind their own name}
+For \code{fix fact(n). if n == 0 then 1 else n * fact(n - 1)},
+applying the resulting closure to $3$ produces \code{D0Vint(6)}.
+\begin{lstlisting}
+# When dfun is a D0Vfix:
+dfix = dfun.arg2
+denv = ENVcns(dfix.arg1, dfun, dfun.arg1)  # function name
+denv = ENVcns(dfix.arg2, darg, denv)       # parameter
+return dfix.arg3.accept(EvaluateVisitor(denv))
+\end{lstlisting}
+Each call extends the defining environment with the same recursive closure
+and the current argument. Closure creation needs no cyclic environment.
+\end{frame}
+
+\begin{frame}[fragile]{Conditionals choose which branch to visit}
+\begin{lstlisting}
+def visit_if0(self, dexp: D0Eif0) -> d0val:
+    cond = dexp.arg1.accept(self)
+    if not isinstance(cond, D0Vbtf):
+        raise TypeError(f"D0Vbtf(...) expected: {cond}")
+    return (dexp.arg2 if cond.arg1 else dexp.arg3).accept(self)
+\end{lstlisting}
+Despite its name, \code{if0} requires a Boolean value in this interpreter.
+\begin{lstlisting}
+term = D0Eif0(D0Ebtf(True), D0Eint(7),
+              D0Eop2("/", D0Eint(1), D0Eint(0)))
+d0exp_evaluate(term)  # D0Vint(7)
+\end{lstlisting}
+The unselected branch never evaluates.
+\end{frame}
+
+\begin{frame}[fragile]{Pairs, operators, and runtime checks}
+\begin{itemize}
+\item Pairs evaluate both components, left to right. Projections require \code{D0Vpair}.
+\item Unary operators \code{+1} and \code{-1} increment and decrement integers.
+\item Binary arithmetic supports \code{+}, \code{-}, \code{*}, and \code{/}.
+\item Comparisons \code{<}, \code{>}, \code{<=}, \code{>=}, \code{==}, and \code{!=} take integers and return \code{D0Vbtf}.
+\end{itemize}
+\begin{lstlisting}
+d0exp_evaluate(D0Eop2("/", D0Eint(-3), D0Eint(2)))
+# D0Vint(-2): division uses Python's floor division (//)
+\end{lstlisting}
+Wrong operand types raise \code{TypeError}. Division by zero raises
+\code{ZeroDivisionError}. There is no static type checker here.
+\end{frame}
+
+\begin{frame}[fragile]{Analysis and evaluation visit different children}
+\begin{lstlisting}
+term = D0Eif0(D0Ebtf(True),
+              D0Eint(7), D0Evar("missing"))
+
+d0exp_fvset(term)     # frozenset({"missing"})
+d0exp_evaluate(term)  # D0Vint(7)
+\end{lstlisting}
+\textbf{Free-variable analysis} visits all branches because it describes syntax.
+\medskip
+
+\textbf{Evaluation} visits the selected branch because it follows execution.
+\medskip
+
+Both use the same \code{accept} protocol. Each visitor defines its own traversal.
+\end{frame}
+
+\begin{frame}{Questions for discussion}
+\begin{enumerate}
+\item What is $\operatorname{FV}(\lambda x.\ x+y)$?
+\medskip
+\item What happens when we evaluate $(\lambda x.\ 42)\,(1/0)$?
+\medskip
+\item Why does the lexical-scope example return $11$?
+\medskip
+\item Which classes change if we add a \code{D0Eneg} expression?
+\medskip
+\item Does \code{accept} itself recursively visit every child?
+\end{enumerate}
+\end{frame}
+
+\begin{frame}{Discussion answers}
+\begin{enumerate}
+\item $\{y\}$, because the lambda binds $x$.
+\medskip
+\item Argument evaluation raises \code{ZeroDivisionError} before the body runs.
+\medskip
+\item The closure captures $x=10$, and application adds $y=1$.
+\medskip
+\item Add \code{D0Eneg.accept}, declare \code{visit\_neg} in \code{D0ExpVisitor}, and implement it in each concrete visitor.
+\medskip
+\item No. Each visitor method decides how to visit children.
+\end{enumerate}
+\end{frame}
+
+\begin{frame}{Reading the implementation}
+Source: \code{../lambda1\_vp.py}
+\begin{enumerate}
+\item Expression dataclasses and their \code{accept} methods.
+\item \code{D0ExpVisitor[R]} and its abstract cases.
+\item \code{FreeVariableVisitor} and the \code{d0exp\_fvset} wrapper.
+\item Runtime values, environments, and \code{d0env\_search}.
+\item \code{EvaluateVisitor} and the \code{d0exp\_evaluate} wrapper.
+\end{enumerate}
+\medskip
+The node supplies its expression form. The visitor supplies the operation.
+\end{frame}
+\end{document}

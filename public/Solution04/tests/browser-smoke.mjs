@@ -1,0 +1,37 @@
+// Run with Chrome's debugging endpoint on 9224 and the app on 8040.
+import {writeFile} from 'node:fs/promises';
+const pages=await (await fetch('http://127.0.0.1:9224/json')).json();
+const ws=new WebSocket(pages.find(p=>p.type==='page').webSocketDebuggerUrl);
+await new Promise(r=>ws.addEventListener('open',r,{once:true}));
+let seq=0;const pending=new Map();
+ws.addEventListener('message',e=>{const x=JSON.parse(e.data);if(x.id){pending.get(x.id)?.(x);pending.delete(x.id);}});
+const call=(method,params={})=>new Promise(resolve=>{const id=++seq;pending.set(id,resolve);ws.send(JSON.stringify({id,method,params}));});
+const evaluate=async expression=>{const r=await call('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.result.exceptionDetails)throw new Error(JSON.stringify(r.result.exceptionDetails));return r.result.result.value;};
+await call('Page.enable');await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
+await call('Page.navigate',{url:'http://127.0.0.1:8040'});
+await new Promise(r=>setTimeout(r,700));
+const result=await evaluate(`(async()=>{
+const check=(ok,msg)=>{if(!ok)throw Error(msg+' | '+document.body.innerText); };
+const wait=async()=>{for(let i=0;i<200;i++){if(!busy)return;await new Promise(r=>setTimeout(r,30));}throw Error('busy did not clear');};
+const choose=async value=>{$('load').value=value;$('load').dispatchEvent(new Event('change'));await wait();};
+const edit=text=>{$('editor').value=text;$('editor').dispatchEvent(new Event('input'));};
+const action=async op=>{document.querySelector('[data-action="'+op+'"]').click();await wait();};
+await wait();await choose('Factorial');await action('interpret');check($('results').textContent.includes('120'),'factorial');
+await choose('Fibonacci');await action('interpret');check($('results').textContent.includes('55'),'fibonacci');
+await choose('manual');check($('editor').value==='','manual blank');
+edit('D0Evar("<img src=x onerror=alert(1)>")');check($('load').disabled,'dirty replacement blocked');check(document.querySelector('[data-action="lint"]').disabled,'dirty action blocked');
+$('apply').click();await wait();await action('lint');check($('results').textContent.includes('<img'),'literal output');check(!$('results').querySelector('img'),'no HTML execution');
+edit('   ');$('apply').click();await wait();check(!$('notice').hidden,'empty rejection');check($('editor').value==='   ','rejected draft retained');$('discard').click();
+edit('D0Eop2("/", D0Eint(1), D0Eint(0))');$('apply').click();await wait();await action('lint');check(state.results.at(-1).outcome==='success','closed lint');await action('interpret');check(state.results.at(-1).outcome==='runtime_error','runtime failure');
+await action('typecheck');await action('compile');check(state.results.at(-1).outcome==='not_implemented','placeholder');check(document.querySelector('[data-action="execute"]').disabled,'execute disabled');
+await choose('Arithmetic');await action('interpret');check(state.results.at(-1).text.includes('42'),'recovery');
+const upload=async file=>{const transfer=new DataTransfer();transfer.items.add(file);$('file').files=transfer.files;await $('file').onchange();};
+await upload(new File([new Uint8Array([255,254])],'bad.lambda'));check($('notice').textContent.includes('UTF-8'),'invalid UTF8');check(state.source.includes('20'),'source preserved');
+await upload(new File(['D0Eint(7)'],'seven.lambda'));check(state.name==='seven.lambda','upload');await action('interpret');check(state.results.at(-1).text.includes('7'),'uploaded source');
+await choose('Factorial');await action('lint');await action('interpret');return 'Browser smoke checks passed';
+})()`);
+console.log(result);
+const shot=await call('Page.captureScreenshot',{format:'png'});await writeFile('/tmp/lambda-workbench.png',Buffer.from(shot.result.data,'base64'));
+await call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
+console.log('Mobile overflow:',await evaluate('document.documentElement.scrollWidth > innerWidth'));
+ws.close();

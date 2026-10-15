@@ -1,0 +1,159 @@
+\documentclass[aspectratio=169,11pt]{beamer}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb}
+\definecolor{ink}{HTML}{173247}
+\definecolor{accent}{HTML}{007E87}
+\definecolor{paper}{HTML}{FAFAF7}
+\setbeamercolor{normal text}{fg=ink,bg=paper}
+\setbeamercolor{frametitle}{fg=ink}
+\setbeamercolor{structure}{fg=accent}
+\setbeamerfont{frametitle}{size=\Large,series=\bfseries}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}{\hfill\usebeamercolor[fg]{structure}\small\insertframenumber\hspace{7mm}\vspace{4mm}}
+\setbeamersize{text margin left=10mm,text margin right=10mm}
+\setbeamertemplate{itemize items}[circle]
+\newcommand{\key}[1]{{\color{accent}#1}}
+\begin{document}
+
+% Source: lambda_calculus_intuitive_explanation.pdf, introduction and section 7.
+\begin{frame}
+\vspace{7mm}
+{\Huge\bfseries An Intuitive Introduction\\[3mm]to Lambda Calculus\par}
+\vspace{9mm}
+{\Large Computation with functions\par}
+\vspace{12mm}
+{\normalsize CS413\par}
+\vspace{3mm}
+{\small Based on \emph{An Intuitive Introduction to Lambda Calculus}}
+\end{frame}
+
+% Source: section 1, p. 1.
+\begin{frame}{Anonymous functions}
+An ordinary function has a name:
+\[f(x)=x+1\]
+Lambda notation writes the function itself:
+\[\key{\lambda x.\,x+1}\]
+Read it as ``take $x$ and return $x+1$.''
+\vspace{4mm}
+
+Python uses the same idea: \quad\texttt{lambda x: x + 1}
+\end{frame}
+
+% Source: section 2, pp. 1--2. Arithmetic distinction made explicit.
+\begin{frame}{Application and beta reduction}
+Applying a function supplies an argument:
+\[\key{(\lambda x.\,x+1)\;5}\]
+\begin{align*}
+(\lambda x.\,x+1)\;5 &\longrightarrow_{\beta} 5+1 \\
+&=6
+\end{align*}
+Beta reduction substitutes the argument for the parameter.
+\vspace{5mm}
+
+{\small Here, numbers and addition are familiar teaching notation. The last step is arithmetic.}
+\end{frame}
+
+% Source: section 3, p. 2.
+\begin{frame}{The entire syntax of pure lambda calculus}
+\begin{align*}
+x &\qquad \text{variable}\\[3mm]
+\lambda x.\,M &\qquad \text{abstraction (a function)}\\[3mm]
+M\;N &\qquad \text{application}
+\end{align*}
+\vspace{3mm}
+$M$ and $N$ stand for expressions.
+\vspace{5mm}
+
+Pure lambda calculus has no built-in numbers, addition, Booleans, or loops.
+\end{frame}
+
+% Source: section 4, pp. 2--3. Parenthesization is an explanatory addition.
+\begin{frame}{Functions as arguments and results}
+\[\key{\lambda f.\,\lambda x.\,f\;x}\]
+First take $f$. Return a function that takes $x$ and applies $f$ to it.
+\vspace{3mm}
+\begin{align*}
+((\lambda f.\,\lambda x.\,f\;x)\;(\lambda y.\,y+1))\;5
+&\longrightarrow_{\beta}(\lambda x.\,(\lambda y.\,y+1)\;x)\;5\\
+&\longrightarrow_{\beta}(\lambda y.\,y+1)\;5\\
+&\longrightarrow_{\beta}5+1=6
+\end{align*}
+{\small Application groups to the left: $M\;N\;P$ means $(M\;N)\;P$.}
+\end{frame}
+
+% Source: section 5, p. 3.
+\begin{frame}{Church numerals: numbers as repetition}
+A numeral tells us how many times to apply a function.
+\begin{align*}
+\mathbf{0}&\equiv\lambda f.\,\lambda x.\,x\\[2mm]
+\mathbf{1}&\equiv\lambda f.\,\lambda x.\,f\;x\\[2mm]
+\mathbf{2}&\equiv\lambda f.\,\lambda x.\,f\;(f\;x)\\[2mm]
+\mathbf{3}&\equiv\lambda f.\,\lambda x.\,f\;(f\;(f\;x))
+\end{align*}
+\key{The function's behavior encodes the number.}
+\end{frame}
+
+% Source: section 5, p. 3. Exercise is derived from the same definition.
+\begin{frame}{Using a Church numeral}
+Let $\mathrm{step}=\lambda n.\,n+10$.
+\begin{align*}
+\mathbf{3}\;\mathrm{step}\;0
+&\longrightarrow_{\beta}^{*}\mathrm{step}\;(\mathrm{step}\;(\mathrm{step}\;0))\\[2mm]
+&=\mathrm{step}\;(\mathrm{step}\;10)\\[2mm]
+&=\mathrm{step}\;20\\[2mm]
+&=30
+\end{align*}
+{\small $\longrightarrow_{\beta}^{*}$ denotes zero or more beta-reduction steps. Arithmetic remains teaching notation.}
+\vspace{4mm}
+
+\key{Quick check:} What does $\mathbf{2}\;\mathrm{step}\;5$ produce?
+\end{frame}
+
+% Source: section 6, p. 4.
+\begin{frame}{Booleans as choices}
+\begin{align*}
+\mathrm{TRUE}&\equiv\lambda x.\,\lambda y.\,x\\[3mm]
+\mathrm{FALSE}&\equiv\lambda x.\,\lambda y.\,y
+\end{align*}
+TRUE chooses the first argument.\\[2mm]
+FALSE chooses the second argument.
+\vspace{3mm}
+\begin{align*}
+\mathrm{TRUE}\;A\;B&\longrightarrow_{\beta}^{*}A\\
+\mathrm{FALSE}\;A\;B&\longrightarrow_{\beta}^{*}B
+\end{align*}
+\end{frame}
+
+% Source: section 6, p. 4.
+\begin{frame}{A conditional built from functions}
+\[\key{\mathrm{IF}\equiv\lambda b.\,\lambda x.\,\lambda y.\,b\;x\;y}\]
+The Boolean $b$ selects one of the two branches.
+\begin{align*}
+\mathrm{IF}\;\mathrm{TRUE}\;A\;B
+&\longrightarrow_{\beta}^{*}\mathrm{TRUE}\;A\;B
+\longrightarrow_{\beta}^{*}A\\[4mm]
+\mathrm{IF}\;\mathrm{FALSE}\;A\;B
+&\longrightarrow_{\beta}^{*}\mathrm{FALSE}\;A\;B
+\longrightarrow_{\beta}^{*}B
+\end{align*}
+\vspace{4mm}
+Boolean choice needs only abstraction and application.
+\end{frame}
+
+% Source: sections 7--8, pp. 4--5. Free/bound example and exercise answer added.
+\begin{frame}{Computational power and the next step}
+Variables, abstraction, and application suffice to express arbitrary computation.
+\vspace{4mm}
+
+Functions can encode numbers, Booleans, data structures, and recursion.
+\vspace{5mm}
+
+\key{Next: precise substitution and variable binding}
+\[\lambda x.\,x\;y\qquad\text{$x$ is bound, $y$ is free}\]
+{\small Substitution must preserve the meaning of free variables.}
+\vspace{4mm}
+
+{\small Quick-check answer: $\mathbf{2}\;\mathrm{step}\;5=25$.}
+\end{frame}
+\end{document}

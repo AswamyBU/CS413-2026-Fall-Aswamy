@@ -7,8 +7,7 @@ Tuesday, October 6, 2026.
 
 ## Attention
 
-Keep everything you submit in `assigns/04/MySolution/`. The instructor's
-reference implementation is in `Solution/`.
+Keep everything you submit in `assigns/04/MySolution/`.
 
 ## Objective
 
@@ -24,11 +23,28 @@ checker or compiler is not required.
 
 ## Scope and starting point
 
-Read [README.00](README.00), the stakeholder brief. A local, single-user
-application is sufficient. User accounts, public deployment, saved test
-collections, and persistence across server restarts are not required.
+Here is the stakeholder brief:
 
-Use Python 3.12 or later and the supplied [lambda1.py](Solution/lambda1.py).
+I have just covered Software Architectures. I want my students to
+use MVC to build a web front-end for programming language system
+(where the language is LAMBDA).
+
+ - Input: A user can upload a file containing some code from his own
+   computer
+
+ - Actions: there are some buttons to determine what actions can be
+   performed: lint (checking if there exists an undeclared variable),
+   interpret (d0exp_evaluate), type-check (placeholder), compile
+   (placeholder), execute (for testing generated code).
+
+ - Output: Textural output can be shown on the web page.
+
+
+A local, single-user application is sufficient. User accounts, public
+deployment, saved test collections, and persistence across server
+restarts are not required.
+
+Use Python 3.12 or later and the supplied [lambda1.py](./lambda1.py).
 For now, input is a single Python constructor expression of type `d0exp`, not
 a Python script or a new concrete syntax for LAMBDA. For example:
 

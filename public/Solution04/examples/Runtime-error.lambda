@@ -1,0 +1,2 @@
+# Closed, but not safe to evaluate: Lint passes; Interpret fails.
+D0Eop2("/", D0Eint(1), D0Eint(0))
