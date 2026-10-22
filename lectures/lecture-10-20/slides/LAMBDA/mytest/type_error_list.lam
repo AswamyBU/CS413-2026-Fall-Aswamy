@@ -1,0 +1,2 @@
+# Expected type error: a List[int] cannot contain a bool element.
+bad_list : List[int] = list_cons(true, list_cons(1, list_nil()));

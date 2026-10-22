@@ -1,0 +1,15 @@
+# The list's element type flows through list_head and recursive calls.
+
+double : int -> int = lam (n : int) => n * 2;
+
+double_all : List[int] -> List[int] =
+  fix double_all(xs: List[int]): List[int] =>
+    if list_nilq(xs) then list_nil()
+    else list_cons(double(list_head(xs)), double_all(list_tail(xs)));
+
+source : List[int] = list_cons(2, list_cons(5, list_nil()));
+result : List[int] = double_all(source);
+
+option_value : Option[int] = optn_cons(list_head(result));
+has_value : bool = if optn_nilq(option_value) then false else true;
+value : int = if has_value then optn_get(option_value) else 0;

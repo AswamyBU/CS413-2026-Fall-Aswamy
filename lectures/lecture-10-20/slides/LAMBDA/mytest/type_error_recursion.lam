@@ -1,0 +1,3 @@
+# Expected type error: this int -> int recursive function returns bool.
+bad_recursive : int -> int =
+  fix bad_recursive(n: int): int => n < 1;

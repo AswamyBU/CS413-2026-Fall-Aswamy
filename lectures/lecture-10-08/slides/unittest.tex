@@ -1,0 +1,430 @@
+\documentclass[aspectratio=169,11pt]{beamer}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{listings}
+\usepackage{booktabs}
+\definecolor{navy}{RGB}{25,48,76}
+\definecolor{teal}{RGB}{0,112,120}
+\definecolor{codebg}{RGB}{246,247,249}
+\setbeamercolor{structure}{fg=teal}
+\setbeamercolor{frametitle}{fg=navy}
+\setbeamercolor{title}{fg=navy}
+\setbeamercolor{normal text}{fg=navy,bg=white}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}{\hfill\usebeamercolor[fg]{structure}\insertframenumber\,/\,\inserttotalframenumber\hspace{5mm}\vspace{3mm}}
+\setbeamertemplate{itemize items}[circle]
+\setbeamersize{text margin left=9mm,text margin right=9mm}
+\lstset{language=Python,basicstyle=\ttfamily\small,keywordstyle=\color{teal}\bfseries,commentstyle=\color{gray},stringstyle=\color{teal},backgroundcolor=\color{codebg},frame=none,showstringspaces=false,columns=fullflexible,keepspaces=true,breaklines=true,xleftmargin=2mm,xrightmargin=2mm,aboveskip=8pt,belowskip=8pt}
+\newcommand{\code}[1]{\texttt{#1}}
+\usepackage{amsmath}
+\title{Testing Python with unittest}
+\subtitle{Test cases, fixtures, and controlled dependencies}
+\author{CS413}
+\date{October 8, 2026}
+\begin{document}
+\begin{frame}\titlepage\end{frame}
+\begin{frame}[fragile]{Python's built-in testing framework}
+\begin{itemize}
+\item \code{unittest} comes with Python. No separate installation is needed.
+\item Tests are methods on subclasses of \code{unittest.TestCase}.
+\item A runner executes the tests and reports their outcomes.
+\end{itemize}
+\begin{lstlisting}
+python3 -m unittest -v
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{An executable contract}
+\begin{itemize}
+\item For a stack, the last item pushed should be the first item popped.
+\item Popping an empty stack should raise \code{IndexError}.
+\item Tests turn these expectations into repeatable checks.
+\item Passing examples provide evidence. They do not prove correctness for every input.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{The stack under test}
+\begin{lstlisting}
+# stack.py
+class Stack:
+    def __init__(self):
+        self._items = []
+
+    def push(self, value):
+        self._items.append(value)
+
+    def pop(self):
+        if not self._items:
+            raise IndexError("empty stack")
+        return self._items.pop()
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{A first TestCase}
+\begin{lstlisting}
+# test_stack.py
+import unittest
+from stack import Stack
+
+class TestStack(unittest.TestCase):
+    def test_pop_returns_last_pushed(self):
+        stack = Stack()
+        stack.push("x")
+        stack.push("y")
+        self.assertEqual(stack.pop(), "y")
+
+if __name__ == "__main__":
+    unittest.main()
+\end{lstlisting}
+The guard enables direct execution without running the suite on import.
+\end{frame}
+
+\begin{frame}[fragile]{Running the examples}
+\begin{lstlisting}
+cd examples/unittest_demo
+python3 -m unittest -v
+python3 -m unittest test_stack
+python3 -m unittest test_stack.TestStack
+python3 -m unittest test_stack.TestStack.test_empty_pop
+python3 test_stack.py -v
+\end{lstlisting}
+The last command uses the \code{unittest.main()} guard.
+
+All example commands run from this demo directory.
+\end{frame}
+
+\begin{frame}[fragile]{Discovery and selection}
+\begin{lstlisting}
+python3 -m unittest discover -s . -p 'test*.py' -v
+python3 -m unittest -k pop
+python3 -m unittest -f
+python3 -m unittest -b
+\end{lstlisting}
+\begin{itemize}
+\item Default discovery uses \code{test*.py} files and methods starting with \code{test}.
+\item \code{-k} matches a substring or wildcard pattern, not a pytest Boolean expression.
+\item \code{-f} stops at the first failure or error. \code{-b} buffers output.
+\item For nested test directories, use importable packages with \code{\_\_init\_\_.py}.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Failures and errors}
+Suppose \code{pop()} incorrectly calls \code{self.\_items.pop(0)}.
+\begin{lstlisting}
+FAIL: test_pop_returns_last_pushed (...)
+...
+AssertionError: 'x' != 'y'
+- x
++ y
+\end{lstlisting}
+\begin{itemize}
+\item A failed assertion reports a failure.
+\item An unexpected exception, such as \code{NameError}, reports an error.
+\item Read the failing expectation and traceback before changing the code.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Assertion methods express the expectation}
+\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{ll}
+\toprule
+Method & Meaning \\
+\midrule
+\code{assertEqual(a, b)} & Equal values \\
+\code{assertIs(a, b)} & The same object \\
+\code{assertIsNone(x)} & The value is \code{None} \\
+\code{assertIn(x, xs)} & Membership \\
+\code{assertTrue(p)} & Truthiness \\
+\code{assertCountEqual(a, b)} & Same elements and multiplicities \\
+\bottomrule
+\end{tabular}
+\medskip
+
+For equality, \code{assertEqual(a, b)} usually gives a clearer diagnostic
+than \code{assertTrue(a == b)}.
+\end{frame}
+
+\begin{frame}[fragile]{Values, identity, and order}
+\begin{lstlisting}
+def test_list_behavior(self):
+    a = [1, 2]
+    b = [1, 2]
+    self.assertEqual(a, b)
+    self.assertIsNot(a, b)
+    self.assertCountEqual([1, 2, 2], [2, 1, 2])
+\end{lstlisting}
+\begin{itemize}
+\item Choose the assertion from the contract.
+\item A stack test needs order-sensitive equality.
+\item Use \code{assertCountEqual} only when ordering is irrelevant.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Expected exceptions}
+\begin{lstlisting}
+def test_empty_pop(self):
+    stack = Stack()
+    with self.assertRaisesRegex(IndexError, "empty stack"):
+        stack.pop()
+\end{lstlisting}
+\begin{itemize}
+\item \code{assertRaises} checks the exception type.
+\item \code{assertRaisesRegex} also searches the message with a regular expression.
+\item No exception or a different exception makes the test unsuccessful.
+\item Keep unrelated setup outside the context manager.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Fresh state with setUp}
+\begin{lstlisting}
+class TestStack(unittest.TestCase):
+    def setUp(self):
+        self.stack = Stack()
+
+    def test_round_trip(self):
+        self.stack.push(7)
+        self.assertEqual(self.stack.pop(), 7)
+
+    def test_empty_pop(self):
+        with self.assertRaises(IndexError):
+            self.stack.pop()
+\end{lstlisting}
+Each test gets a new \code{TestCase} instance and its own \code{setUp()} call.
+\end{frame}
+
+\begin{frame}[fragile]{Fixture lifecycle}
+\begin{itemize}
+\item For a normal test: \code{setUp()}, test method, \code{tearDown()}, cleanups.
+\item \code{tearDown()} runs after a failing test if \code{setUp()} succeeded.
+\item If \code{setUp()} raises, the test and \code{tearDown()} do not run.
+\item Registered \code{addCleanup} callbacks still run if setup fails.
+\item Cleanup callbacks run in reverse registration order.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Temporary resources and cleanup}
+\begin{lstlisting}
+import tempfile
+from pathlib import Path
+
+class TestFiles(unittest.TestCase):
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.directory = Path(temp.name)
+
+    def test_text_round_trip(self):
+        path = self.directory / "out.txt"
+        path.write_text("hello", encoding="utf-8")
+        self.assertEqual(path.read_text(encoding="utf-8"),
+                         "hello")
+\end{lstlisting}
+Register cleanup immediately after acquiring the resource.
+\end{frame}
+
+\begin{frame}[fragile]{Shared fixtures and test independence}
+\begin{itemize}
+\item \code{setUpClass} and \code{tearDownClass} manage class-level resources.
+\item Use \code{@classmethod} for these methods.
+\item A shared mutable resource can leak state between tests.
+\item Prefer per-test setup until the cost justifies sharing.
+\item Each test should pass when run alone. Tests must not depend on their execution order.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Multiple cases with subTest}
+\begin{lstlisting}
+def test_lifo_cases(self):
+    for values in ([], [7], [2, 5, 2]):
+        with self.subTest(values=values):
+            stack = Stack()
+            for value in values:
+                stack.push(value)
+            actual = [stack.pop() for _ in values]
+            self.assertEqual(actual, list(reversed(values)))
+\end{lstlisting}
+\begin{itemize}
+\item A failing subtest reports its parameters and normally allows the loop to continue.
+\item These are subcases of one test method, not separately discovered methods.
+\item Construct fresh state inside each subtest.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Choosing useful cases}
+\begin{itemize}
+\item An empty stack exercises the error contract.
+\item Distinct values expose FIFO behavior accidentally implemented as LIFO.
+\item Repeated values detect implementations that discard duplicates.
+\item Interleaved pushes and pops exercise changes in state.
+\item A regression test should fail with the specific bug and pass after the fix.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Floating-point expectations}
+\begin{lstlisting}
+def test_decimal_sum(self):
+    self.assertAlmostEqual(0.1 + 0.2, 0.3, delta=1e-12)
+\end{lstlisting}
+\begin{itemize}
+\item \code{delta} sets an absolute tolerance.
+\item Choose the tolerance from the numerical requirements.
+\item The default \code{places=7} checks rounded differences, not significant digits.
+\item For a relative tolerance, use \code{math.isclose} with explicit tolerances.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Capturing printed output}
+\begin{lstlisting}
+from contextlib import redirect_stdout
+from io import StringIO
+from stack import announce
+
+def test_announce(self):
+    output = StringIO()
+    with redirect_stdout(output):
+        announce("Ada")
+    self.assertEqual(output.getvalue(), "Hello, Ada!\n")
+\end{lstlisting}
+Here \code{announce(name)} calls \code{print(f"Hello, \{name\}!")}.
+
+The newline is part of the expected output.
+\end{frame}
+
+\begin{frame}[fragile]{Controlling environment variables}
+\begin{lstlisting}
+# stack.py
+import os
+
+def greeting():
+    return "Hello, " + os.getenv("USER_NAME", "guest")
+
+# Inside a TestCase
+from unittest.mock import patch
+
+def test_greeting(self):
+    with patch.dict("os.environ", {"USER_NAME": "Ada"}):
+        self.assertEqual(greeting(), "Hello, Ada")
+\end{lstlisting}
+Place the imports at module scope. The context restores the environment.
+\end{frame}
+
+\begin{frame}[fragile]{Mocking an external dependency}
+\begin{lstlisting}
+# service.py
+from urllib.request import urlopen
+
+def status_code(url):
+    with urlopen(url, timeout=2) as response:
+        return response.status
+
+# Inside a TestCase; patch is imported at module scope
+@patch("service.urlopen", autospec=True)
+def test_status_code(self, mock_open):
+    mock_open.return_value.__enter__.return_value.status = 200
+    self.assertEqual(status_code("https://example.org"), 200)
+    mock_open.assert_called_once_with("https://example.org",
+                                      timeout=2)
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Where to patch, and what a mock proves}
+\begin{itemize}
+\item Patch \code{service.urlopen}: that is where \code{status\_code} looks up the name.
+\item Patching the original library after \code{service} imports the name would miss this reference.
+\item \code{autospec=True} constrains the mock to the original interface where inspectable.
+\item The test checks our interaction with a substitute. It does not establish that the network service works.
+\item Separate integration tests can exercise the real dependency.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Skipped tests and expected failures}
+\begin{lstlisting}
+@unittest.skip("requires the course server")
+def test_server(self):
+    ...
+
+@unittest.expectedFailure
+def test_known_bug(self):
+    self.assertEqual(buggy_function(), expected)
+\end{lstlisting}
+\begin{itemize}
+\item Illustrative placeholders, not part of the runnable demo.
+\item A skipped test does not run. An expected failure documents a known bug.
+\item An unexpected success makes the unittest run unsuccessful.
+\item Use a reason or issue reference so the marker can be revisited.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{unittest and pytest: equivalent intentions}
+\renewcommand{\arraystretch}{1.55}
+\begin{tabular}{p{.45\textwidth}p{.45\textwidth}}
+\toprule
+\code{unittest} & \code{pytest} \\
+\midrule
+\code{TestCase} method & Usually a plain function \\
+\code{self.assertEqual(a, b)} & \code{assert a == b} \\
+\code{self.assertRaises(E)} & \code{pytest.raises(E)} \\
+\code{setUp} / cleanups & Fixtures / yield cleanup \\
+\code{subTest} loop & \code{mark.parametrize} cases \\
+Standard library & Separately installed package \\
+\bottomrule
+\end{tabular}
+\medskip
+
+Both can express the same behavioral expectations. The setup and
+reporting conventions differ.
+\end{frame}
+
+\begin{frame}[fragile]{Exercise: free variables}
+For tuple-based expressions, the intended rules are:
+\[
+FV(x)=\{x\},\qquad FV(e_1\ e_2)=FV(e_1)\cup FV(e_2)
+\]
+\[
+FV(\lambda x.e)=FV(e)\setminus\{x\}
+\]
+\begin{lstlisting}
+("var", "x")
+("app", ("var", "x"), ("var", "y"))
+("lam", "x", ("var", "x"))
+\end{lstlisting}
+\begin{itemize}
+\item Write tests for a bound variable and a variable that remains free.
+\item Add an application and a nested lambda, using \code{subTest}.
+\item Which case detects a missing subtraction in the lambda rule?
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Exercise discussion}
+\begin{lstlisting}
+from expr import free_vars
+
+class TestFreeVars(unittest.TestCase):
+    def test_cases(self):
+        cases = [
+            (("lam", "x", ("var", "x")), set()),
+            (("lam", "x", ("var", "y")), {"y"}),
+            (("app", ("var", "x"), ("var", "y")), {"x", "y"}),
+        ]
+        for expr, expected in cases:
+            with self.subTest(expr=expr):
+                self.assertEqual(free_vars(expr), expected)
+\end{lstlisting}
+The first case detects the missing subtraction. The demo includes a nested case.
+\end{frame}
+
+\begin{frame}[fragile]{Testing workflow and references}
+\begin{itemize}
+\item Write a specific expectation and observe the intended failure.
+\item Fix the implementation, rerun the test, then run the suite.
+\item Check that the reported test count is plausible. An empty suite proves nothing.
+\item Demo: \code{examples/unittest\_demo/}.
+\end{itemize}
+\medskip
+Official Python documentation:
+\begin{itemize}
+\item \href{https://docs.python.org/3/library/unittest.html}{unittest: cases, assertions, fixtures, and discovery}
+\item \href{https://docs.python.org/3/library/unittest.mock.html}{unittest.mock: patching and test doubles}
+\end{itemize}
+\end{frame}
+\end{document}

@@ -1,0 +1,282 @@
+\documentclass[aspectratio=169,11pt]{beamer}
+\usetheme{Madrid}
+\usecolortheme{seahorse}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{listings}
+\lstset{basicstyle=\ttfamily\small, columns=fullflexible, keepspaces=true,
+  showstringspaces=false, frame=single, xleftmargin=2pt, xrightmargin=2pt}
+\newcommand{\Bool}{\mathsf{Bool}}
+\newcommand{\Int}{\mathsf{Int}}
+\newcommand{\Arrow}{\mathbin{\to}}
+\newcommand{\judge}[3]{#1\vdash #2:#3}
+\title[Type-checking]{Type-checking: making sure programs make sense}
+\subtitle{A friendly tour of simple types}
+\author{CS 413}
+\date{October 20, 2026}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\begin{frame}[fragile]{A tiny puzzle}
+\begin{columns}[T]
+\column{.52\textwidth}
+\begin{block}{This looks fine}
+\begin{lstlisting}
+if 3 < 5 then 10 else 20
+\end{lstlisting}
+\end{block}
+\begin{block}{This one?}
+\begin{lstlisting}
+if 3 then false else 20
+\end{lstlisting}
+\end{block}
+\column{.43\textwidth}
+Can we catch the problem before running the program?\medskip
+
+Type-checking answers questions like:
+\begin{itemize}
+  \item Is the condition a boolean?
+  \item Do both branches agree on a result type?
+  \item Is a function given the kind of input it expects?
+\end{itemize}
+\end{columns}
+\end{frame}
+
+\begin{frame}{What do types buy us?}
+\begin{itemize}
+  \item Catch certain mistakes early, with a useful location and explanation.
+  \item Document how pieces of a program are meant to fit together.
+  \item Let later stages make safe assumptions (for example, about operations).
+\end{itemize}
+\bigskip
+\begin{alertblock}{A type checker is not an oracle}
+It does not prove that a program is useful, terminates, or matches the programmer's intent. It checks a particular set of consistency rules.
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{Our little language}
+\begin{columns}[T]
+\column{.49\textwidth}
+\textbf{Expressions}
+\begin{align*}
+e ::= {}& n \mid \mathsf{true} \mid \mathsf{false} \mid x \mid e+e \mid e<e\\
+       &\mid \mathsf{if}\ e\ \mathsf{then}\ e\ \mathsf{else}\ e
+        \mid \lambda x{:}T.e \mid e\ e
+\end{align*}
+\column{.47\textwidth}
+\textbf{Types}
+\[
+T ::= \Int \mid \Bool \mid T\Arrow T
+\]
+\medskip
+Examples:
+\begin{itemize}
+  \item $42 : \Int$
+  \item $\mathsf{false} : \Bool$
+  \item $\Int\Arrow\Bool$ is the type of functions from integers to booleans.
+\end{itemize}
+\end{columns}
+\end{frame}
+
+\begin{frame}{A type is a promise about use}
+\begin{block}{Read the arrow left to right}
+\[
+  \Int\Arrow\Bool \qquad\text{means}\qquad
+  \text{“give me an integer; I'll return a boolean.”}
+\]
+\end{block}
+\begin{exampleblock}{A typed function}
+\[
+  \lambda (x:\Int).\ x<10 : \Int\Arrow\Bool
+\]
+The annotation says what the function expects; the body confirms what it returns.
+\end{exampleblock}
+\begin{itemize}
+  \item Function types associate to the right: $\Int\Arrow\Bool\Arrow\Int$ means $\Int\Arrow(\Bool\Arrow\Int)$.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Typing judgments: the checker’s question}
+\[
+  \Gamma \vdash e:T
+\]
+Read: “under assumptions $\Gamma$, expression $e$ has type $T$.”
+\begin{itemize}
+  \item $\Gamma$ is the environment: a lookup table for variables.
+  \item Example: $\Gamma = \{x:\Int,\ f:\Int\Arrow\Bool\}$.
+  \item Then $\Gamma\vdash f\ x:\Bool$.
+\end{itemize}
+\begin{block}{Why keep assumptions around?}
+When checking a function body, we need to remember the parameter's type. When checking a variable, we look it up.
+\end{block}
+\end{frame}
+
+\begin{frame}{The easy rules}
+\small
+\begin{columns}[T]
+\column{.49\textwidth}
+\textbf{Constants and variables}
+\[
+\frac{}{\Gamma\vdash n:\Int}\qquad
+\frac{}{\Gamma\vdash \mathsf{true}:\Bool}\qquad
+\frac{x:T\in\Gamma}{\Gamma\vdash x:T}
+\]
+\textbf{Addition}
+\[
+\frac{\Gamma\vdash e_1:\Int\quad \Gamma\vdash e_2:\Int}
+     {\Gamma\vdash e_1+e_2:\Int}
+\]
+\column{.49\textwidth}
+\textbf{Comparison}
+\[
+\frac{\Gamma\vdash e_1:\Int\quad \Gamma\vdash e_2:\Int}
+     {\Gamma\vdash e_1<e_2:\Bool}
+\]
+\textbf{Conditional}
+\[
+\frac{\Gamma\vdash c:\Bool\quad \Gamma\vdash a:T\quad \Gamma\vdash b:T}
+     {\Gamma\vdash \mathsf{if}\ c\ \mathsf{then}\ a\ \mathsf{else}\ b:T}
+\]
+\end{columns}
+\medskip
+The line reads “if the things above it check, the thing below it checks.”
+\end{frame}
+
+\begin{frame}{Functions: introduce, then use}
+\small
+\textbf{Function introduction} (check a lambda):
+\[
+\frac{\Gamma,x:S\vdash e:T}
+     {\Gamma\vdash \lambda(x:S).e:S\Arrow T}
+\]
+Assume the parameter has type $S$, then check the body.
+\medskip
+
+\textbf{Function application} (check a call):
+\[
+\frac{\Gamma\vdash f:S\Arrow T\quad \Gamma\vdash a:S}
+     {\Gamma\vdash f\ a:T}
+\]
+The argument type must match the input type; the result has the output type.
+\begin{exampleblock}{Quick check}
+If $f:\Int\Arrow\Bool$, then $f\ 7:\Bool$ is fine, while $f\ \mathsf{false}$ is not.
+\end{exampleblock}
+\end{frame}
+
+\begin{frame}{Work one through: an integer test}
+Check $\lambda(x:\Int).\ x<10$.
+\[
+\frac{\displaystyle
+  \frac{\displaystyle
+    \frac{}{x:\Int\vdash x:\Int}\qquad
+    \frac{}{x:\Int\vdash 10:\Int}}
+  {x:\Int\vdash x<10:\Bool}}
+{\emptyset\vdash \lambda(x:\Int).\ x<10:\Int\Arrow\Bool}
+\]
+\begin{itemize}
+  \item Add the assumption $x:\Int$ while checking the body.
+  \item Both sides of $<$ are integers, so the body is boolean.
+  \item The whole function therefore has type $\Int\Arrow\Bool$.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Work one through: call the function}
+Let $\mathit{small}=\lambda(x:\Int).\ x<10$. What is $\mathit{small}\ 4$?
+\[
+\frac{\emptyset\vdash\mathit{small}:\Int\Arrow\Bool\qquad
+      \emptyset\vdash 4:\Int}
+     {\emptyset\vdash\mathit{small}\ 4:\Bool}
+\]
+Now try $\mathit{small}\ \mathsf{false}$:
+\begin{alertblock}{Mismatch}
+The function expects an $\Int$, but the argument has type $\Bool$. Reject the call before execution.
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{How a checker can do the work}
+For this language, checking follows the syntax tree recursively:
+\begin{enumerate}
+  \item A literal has its built-in type; a variable uses the environment.
+  \item For $e_1+e_2$, check both children are $\Int$; return $\Int$.
+  \item For a conditional, check a $\Bool$ condition and matching branch types.
+  \item For a function, extend the environment with its parameter type.
+  \item For a call, check the function type and the argument type agree.
+\end{enumerate}
+\begin{block}{A useful mental model}
+The rules are a recipe for a recursive program: inspect the outermost expression, check its parts, and combine their types.
+\end{block}
+\end{frame}
+
+\begin{frame}{When the recipe says “no”}
+\begin{columns}[T]
+\column{.49\textwidth}
+\begin{alertblock}{Bad condition}
+\texttt{if 3 then ... else ...}\
+Expected $\Bool$; got $\Int$.
+\end{alertblock}
+\begin{alertblock}{Branches disagree}
+\texttt{if ready then 0 else false}\
+One branch is $\Int$, the other $\Bool$.
+\end{alertblock}
+\column{.49\textwidth}
+\begin{alertblock}{Bad operator input}
+\texttt{true + 1}\
+$+$ requires two integers.
+\end{alertblock}
+\begin{alertblock}{Bad function argument}
+\texttt{(fun (n:Int) => n+1) false}\
+Expected $\Int$; got $\Bool$.
+\end{alertblock}
+\end{columns}
+\medskip
+Good diagnostics point to the expression and explain the expected and actual types.
+\end{frame}
+
+\begin{frame}{A reassuring promise: progress (informally)}
+For a well-typed program in a carefully designed language:
+\begin{itemize}
+  \item Evaluation does not get stuck trying to add a boolean to an integer.
+  \item A function call does not apply a boolean as though it were a function.
+\end{itemize}
+\begin{block}{This is the type-safety idea}
+Types rule out a useful class of runtime failures. The formal result is often called \emph{type soundness}; its details depend on the language and its operations.
+\end{block}
+It does not rule out every runtime failure: division by zero, bad input, or nontermination may still be possible.
+\end{frame}
+
+\begin{frame}{Try it together}
+Assume $f:\Int\Arrow\Bool$ and $n:\Int$. Find the type, or the first reason it fails:
+\begin{enumerate}
+  \item $f\ (n+1)$
+  \item $\mathsf{if}\ f\ n\ \mathsf{then}\ n+2\ \mathsf{else}\ 0$
+  \item $\mathsf{if}\ n\ \mathsf{then}\ \mathsf{true}\ \mathsf{else}\ \mathsf{false}$
+\end{enumerate}
+\pause
+\begin{exampleblock}{Answers}
+  \begin{enumerate}
+    \item $\Bool$.
+    \item $\Int$.
+    \item Rejected: condition $n$ has type $\Int$, but needs $\Bool$.
+  \end{enumerate}
+\end{exampleblock}
+\end{frame}
+
+\begin{frame}{Takeaways}
+\begin{itemize}
+  \item A type describes how an expression may be used.
+  \item A typing judgment combines an expression, its environment, and its type.
+  \item Each syntax form gets a small rule; checking is recursive.
+  \item Function types connect the argument you provide to the result you get.
+  \item Simple types catch real mistakes, while leaving plenty of interesting bugs for later.
+\end{itemize}
+\bigskip
+\centering\Large Questions?
+\end{frame}
+
+\end{document}

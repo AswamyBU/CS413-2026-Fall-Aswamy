@@ -1,0 +1,64 @@
+# Eight queens, using declarations from mylib/list.lam (load that file first).
+# A board is a list of columns, numbered 0 through 7, in row order.
+# During search the partial board is reversed, newest queen first.
+# queens_solutions contains all 92 boards, including rotations/reflections.
+
+# queens_safe(column, reversed_board): check columns and both diagonals.
+queens_safe = lam (p) =>
+  let
+    column = p.0
+    check = fix check(q) =>
+      if list_nilq(q.0) then true
+      else let
+        other = list_head(q.0)
+        distance = q.1
+      in
+        if column == other then false
+        else if column == other + distance then false
+        else if column == other - distance then false
+        else check(list_tail(q.0), distance + 1)
+      end
+  in
+    check(p.1, 1)
+  end
+
+# queens_solve(n): enumerate all boards for n >= 0.
+# The zero-sized board has one solution: the empty board.
+queens_solve = lam (n) =>
+  let
+    search = fix search(p) =>
+      let
+        board = p.0
+        row = p.1
+      in
+        if row == n then list_singleton(list_reverse(board))
+        else let
+          columns = fix columns(column) =>
+            if column >= n then list_nil()
+            else if queens_safe(column, board)
+                 then list_append(
+                   search(list_cons(column, board), row + 1),
+                   columns(column + 1))
+                 else columns(column + 1)
+        in
+          columns(0)
+        end
+      end
+  in
+    search(list_nil(), 0)
+  end
+
+queens_solutions = queens_solve(8)
+queens_count = list_length(queens_solutions)
+
+# Print one board per line (columns in row order), then the solution count.
+queens_print = fix loop(boards) =>
+  if list_nilq(boards) then ()
+  else let
+    ignored = list_print(list_head(boards))
+  in
+    loop(list_tail(boards))
+  end
+
+queens_printed = queens_print(queens_solutions)
+queens_count_printed = print(queens_count)

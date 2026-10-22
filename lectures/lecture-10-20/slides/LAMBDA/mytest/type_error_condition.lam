@@ -1,0 +1,2 @@
+# Expected type error: an if condition must have type bool, not int.
+bad_condition : int = if 1 then 10 else 20;

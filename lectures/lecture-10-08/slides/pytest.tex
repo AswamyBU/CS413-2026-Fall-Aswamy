@@ -1,0 +1,422 @@
+\documentclass[aspectratio=169,11pt]{beamer}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{listings}
+\usepackage{booktabs}
+\definecolor{navy}{RGB}{25,48,76}
+\definecolor{teal}{RGB}{0,112,120}
+\definecolor{codebg}{RGB}{246,247,249}
+\setbeamercolor{structure}{fg=teal}
+\setbeamercolor{frametitle}{fg=navy}
+\setbeamercolor{title}{fg=navy}
+\setbeamercolor{normal text}{fg=navy,bg=white}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}{\hfill\usebeamercolor[fg]{structure}\insertframenumber\,/\,\inserttotalframenumber\hspace{5mm}\vspace{3mm}}
+\setbeamertemplate{itemize items}[circle]
+\setbeamersize{text margin left=9mm,text margin right=9mm}
+\lstset{language=Python,basicstyle=\ttfamily\small,keywordstyle=\color{teal}\bfseries,commentstyle=\color{gray},stringstyle=\color{teal},backgroundcolor=\color{codebg},frame=none,showstringspaces=false,columns=fullflexible,keepspaces=true,breaklines=true,xleftmargin=2mm,xrightmargin=2mm,aboveskip=8pt,belowskip=8pt}
+\newcommand{\code}[1]{\texttt{#1}}
+\usepackage{amsmath}
+\title{Testing Python with pytest}
+\subtitle{Assertions, fixtures, and tests for language tools}
+\author{CS413}
+\date{October 8, 2026}
+\begin{document}
+\begin{frame}\titlepage\end{frame}
+\begin{frame}[fragile]{Testing as an executable specification}
+\begin{itemize}
+\item A test describes one observable behavior and checks it automatically.
+\item Example: looking up a missing variable should raise a particular exception.
+\item A failing test gives a counterexample to the claimed behavior.
+\item Passing tests provide evidence for the chosen cases, not a proof for all inputs.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Today's goals}
+\begin{itemize}
+\item Write and run tests with ordinary Python assertions.
+\item Choose boundary cases and express them with parametrization.
+\item Use fixtures to control inputs, resources, and side effects.
+\item Add regression tests for a small language implementation.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{A small project}
+\begin{lstlisting}
+pytest_demo/
+    stack.py
+    test_stack.py
+    test_resources.py
+    conftest.py
+    expr.py
+    test_expr.py
+\end{lstlisting}
+Run commands from \code{examples/pytest\_demo/}.
+\begin{lstlisting}
+python3 -m venv .venv
+source .venv/bin/activate  # POSIX shell
+python -m pip install pytest
+python -m pytest -q
+\end{lstlisting}
+
+\end{frame}
+
+\begin{frame}[fragile]{The behavior we want to test}
+\begin{lstlisting}
+# stack.py
+class Stack:
+    def __init__(self):
+        self._items = []
+
+    def push(self, value):
+        self._items.append(value)
+
+    def pop(self):
+        if not self._items:
+            raise IndexError("empty stack")
+        return self._items.pop()
+\end{lstlisting}
+Contract: last in, first out. An empty pop raises \code{IndexError}.
+\end{frame}
+
+\begin{frame}[fragile]{A first test}
+\begin{lstlisting}
+# test_stack.py
+from stack import Stack
+
+def test_pop_returns_last_pushed():
+    stack = Stack()           # arrange
+    stack.push("x")
+    stack.push("y")
+    result = stack.pop()      # act
+    assert result == "y"      # assert
+\end{lstlisting}
+The test name describes the behavior. A failing assertion fails the test.
+\end{frame}
+
+\begin{frame}[fragile]{Discovery and execution}
+\begin{itemize}
+\item By default, pytest searches for \code{test\_*.py} and \code{*\_test.py}.
+\item Test functions start with \code{test\_}. Plain functions are enough.
+\item pytest imports test modules, collects tests, then runs them.
+\item Keep demonstrations out of module-level code to avoid import side effects.
+\end{itemize}\begin{lstlisting}
+python -m pytest --collect-only -q
+\end{lstlisting}
+
+\end{frame}
+
+\begin{frame}[fragile]{Reading a failure}
+Suppose \code{pop()} incorrectly uses \code{self.\_items.pop(0)}.
+\begin{lstlisting}
+>       assert result == "y"
+E       AssertionError: assert 'x' == 'y'
+
+FAILED test_stack.py::test_pop_returns_last_pushed
+\end{lstlisting}
+\begin{itemize}
+\item The node ID identifies the file and test function.
+\item Read the actual and expected values, then inspect the contract.
+\item An exception during fixture setup is reported as an error.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Running a focused set of tests}
+\begin{lstlisting}
+python -m pytest -q
+python -m pytest test_stack.py -v
+python -m pytest test_stack.py::test_empty_pop
+python -m pytest -k "pop and not empty"
+python -m pytest -x
+python -m pytest --lf
+\end{lstlisting}
+\begin{itemize}
+\item \code{-k} selects by a name expression. \code{-x} stops on the first failure.
+\item \code{--lf} reruns previously failing tests using the local cache.
+\item During debugging, run a small selection. Before finishing, run the suite.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Assertions and the test oracle}
+\begin{lstlisting}
+def test_pop_removes_an_item():
+    stack = Stack()
+    stack.push("x")
+    stack.push("y")
+    assert stack.pop() == "y"
+    assert stack.pop() == "x"
+\end{lstlisting}
+\begin{itemize}
+\item The oracle is how the test decides the expected result.
+\item Choose expectations from the specification, independently of the implementation.
+\item Checking only that a result exists can miss an incorrect result.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Expected exceptions}
+\begin{lstlisting}
+import pytest
+
+def test_empty_pop():
+    stack = Stack()
+    with pytest.raises(IndexError, match="empty stack"):
+        stack.pop()
+\end{lstlisting}
+\begin{itemize}
+\item No exception, or a different exception type, fails this test.
+\item \code{match} is a regular expression search on the exception message.
+\item Keep the block narrow. Put assertions about later behavior after it.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Several cases, one test}
+\begin{lstlisting}
+@pytest.mark.parametrize("values", [
+    [],
+    [7],
+    [2, 5, 2],
+], ids=["empty", "singleton", "duplicates"])
+def test_lifo(values):
+    stack = Stack()
+    for value in values:
+        stack.push(value)
+    actual = [stack.pop() for _ in values]
+    assert actual == list(reversed(values))
+\end{lstlisting}
+pytest collects a separate test for each case, with its own result.
+\end{frame}
+
+\begin{frame}[fragile]{Choosing cases that expose mistakes}
+\begin{itemize}
+\item Empty input exercises a boundary or error condition.
+\item A singleton checks the smallest successful operation.
+\item Distinct values reveal ordering mistakes. Duplicates reveal lost elements.
+\item After pushing and popping everything, another pop should fail.
+\item A regression test reproduces a specific bug before the fix and passes after it.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Fixtures supply test inputs}
+\begin{lstlisting}
+# conftest.py
+import pytest
+from stack import Stack
+
+@pytest.fixture
+def stack():
+    return Stack()
+
+# test_stack.py
+def test_fixture_stack(stack):
+    stack.push(7)
+    assert stack.pop() == 7
+\end{lstlisting}
+pytest resolves the argument name \code{stack} and supplies the fixture value.
+\end{frame}
+
+\begin{frame}[fragile]{Fixture lifetime and sharing}
+\begin{itemize}
+\item The default scope is \code{function}: each test gets a fresh stack.
+\item A fixture may request another fixture through its own arguments.
+\item Put shared fixtures in \code{conftest.py}. Tests do not import that file.
+\item Wider scopes include \code{class}, \code{module}, \code{package}, and \code{session}.
+\item A mutable object shared across tests can make results depend on execution order.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Cleanup with a yield fixture}
+\begin{lstlisting}
+@pytest.fixture
+def output_file(tmp_path):
+    stream = (tmp_path / "out.txt").open("w+")
+    yield stream
+    stream.close()
+
+def test_output_file(output_file):
+    output_file.write("hello")
+    output_file.seek(0)
+    assert output_file.read() == "hello"
+\end{lstlisting}
+Setup runs before \code{yield}. Cleanup runs afterward, even if the test fails.
+
+If setup fails before reaching \code{yield}, that trailing cleanup does not run.
+\end{frame}
+
+\begin{frame}[fragile]{Temporary files with tmp\_path}
+\begin{lstlisting}
+def test_save_names(tmp_path):
+    path = tmp_path / "names.txt"
+    path.write_text("Ada\nGrace\n", encoding="utf-8")
+    names = path.read_text(encoding="utf-8").splitlines()
+    assert names == ["Ada", "Grace"]
+\end{lstlisting}
+\begin{itemize}
+\item \code{tmp\_path} provides a separate \code{pathlib.Path} directory per test.
+\item Use it for file-based tests instead of a fixed filename in the project.
+\item This small example illustrates the fixture. Application tests should call the application's file-handling code.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Printed output with capsys}
+\begin{lstlisting}
+def announce(name):
+    print(f"Hello, {name}!")
+
+def test_announce(capsys):
+    announce("Ada")
+    captured = capsys.readouterr()
+    assert captured.out == "Hello, Ada!\n"
+    assert captured.err == ""
+\end{lstlisting}
+\code{capsys} captures Python standard output and standard error.
+
+The newline is part of the expected output.
+\end{frame}
+
+\begin{frame}[fragile]{Environment control with monkeypatch}
+\begin{lstlisting}
+# stack.py
+import os
+
+def greeting():
+    return "Hello, " + os.getenv("USER_NAME", "guest")
+
+# test_resources.py
+from stack import greeting
+
+def test_greeting(monkeypatch):
+    monkeypatch.setenv("USER_NAME", "Ada")
+    assert greeting() == "Hello, Ada"
+\end{lstlisting}
+pytest restores the environment change after the test.
+\end{frame}
+
+\begin{frame}[fragile]{Replacing dependencies}
+\begin{itemize}
+\item Unit tests can replace a clock, network call, or random source with a controlled substitute.
+\item \code{monkeypatch.setattr} temporarily replaces an attribute.
+\item Patch the name where the code under test looks it up.
+\item Keep integration tests that exercise the real boundary too.
+\item A substitute should preserve the relevant interface and behavior. Otherwise a passing test may be misleading.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Floating-point results}
+\begin{lstlisting}
+import pytest
+
+def test_decimal_sum():
+    assert 0.1 + 0.2 == pytest.approx(0.3, abs=1e-12,
+                                   rel=0)
+\end{lstlisting}
+\begin{itemize}
+\item Binary floating-point arithmetic can introduce rounding error.
+\item Choose a tolerance that fits the numerical contract.
+\item Use exact equality for exact results, including integer counts and sets.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Skip and expected failure}
+\begin{lstlisting}
+@pytest.mark.skip(reason="requires the course server")
+def test_server():
+    ...
+
+@pytest.mark.xfail(strict=True, reason="issue 42: known bug")
+def test_known_bug():
+    assert buggy_function() == expected
+\end{lstlisting}
+\begin{itemize}
+\item Illustrative examples: the dependency and bug must exist in a real suite.
+\item \code{skip} does not run the test. \code{xfail} normally runs it expecting failure.
+\item With \code{strict=True}, an unexpected pass fails the suite so you revisit the marker.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{A small language example}
+Our standalone demo represents expressions with tuples:
+\begin{lstlisting}
+("var", "x")
+("app", function_expr, argument_expr)
+("lam", "x", body_expr)
+\end{lstlisting}
+The free-variable rules are:
+\[
+\begin{aligned}
+FV(x) &= \{x\} \\
+FV(e_1\ e_2) &= FV(e_1) \cup FV(e_2) \\
+FV(\lambda x.e) &= FV(e) \setminus \{x\}
+\end{aligned}
+\]
+The same expectations can test a visitor-based implementation.
+\end{frame}
+
+\begin{frame}[fragile]{Exercise: free-variable tests}
+\begin{lstlisting}
+from expr import free_vars
+
+@pytest.mark.parametrize("expr, expected", [
+    (("var", "x"), {"x"}),
+    (("lam", "x", ("var", "x")), set()),
+    # Add an application and a nested lambda.
+])
+def test_free_vars(expr, expected):
+    assert free_vars(expr) == expected
+\end{lstlisting}
+\begin{itemize}
+\item Write a case where a variable remains free inside a lambda.
+\item Which case catches a lambda rule that forgets to remove its binder?
+\item Work for five minutes, then compare cases with a neighbor.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Exercise discussion}
+\begin{lstlisting}
+# Application combines both sets.
+(("app", ("var", "x"), ("var", "y")), {"x", "y"})
+
+# Binding x leaves y free.
+(("lam", "x", ("var", "y")), {"y"})
+
+# Both occurrences of x are bound by the outer lambda.
+(("lam", "x", ("app", ("var", "x"),
+    ("lam", "y", ("var", "x")))), set())
+\end{lstlisting}
+A test of \code{("lam", "x", ("var", "x"))} catches the missing subtraction.
+
+Set equality checks membership without depending on display order.
+\end{frame}
+
+\begin{frame}[fragile]{A reliable testing workflow}
+\begin{itemize}
+\item Describe the intended behavior with a small example.
+\item Write the test and observe the expected failure.
+\item Change the implementation and rerun the focused test.
+\item Run the whole suite before committing the change.
+\item Keep tests independent of execution order, external state, and wall-clock timing.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{What a passing suite tells us}
+\begin{itemize}
+\item The implementation satisfies the assertions on the inputs exercised.
+\item Unasserted behavior and untested cases can still contain bugs.
+\item Code coverage measures execution, not whether the assertions are strong.
+\item A useful check: deliberately introduce a plausible bug and see whether a test catches it.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Reference and practice}
+\begin{itemize}
+\item Demo: \code{examples/pytest\_demo/}. Run \code{python -m pytest -q} there.
+\item Practice: add a stack test that interleaves pushes and pops.
+\item Practice: add a nested-lambda case with both a bound and a free variable.
+\end{itemize}\medskip
+Official pytest documentation:
+\begin{itemize}
+\item \href{https://docs.pytest.org/en/stable/getting-started.html}{Getting started and discovery}
+\item \href{https://docs.pytest.org/en/stable/how-to/assert.html}{Assertions} and \href{https://docs.pytest.org/en/stable/how-to/parametrize.html}{parametrization}
+\item \href{https://docs.pytest.org/en/stable/how-to/fixtures.html}{Fixtures} and \href{https://docs.pytest.org/en/stable/how-to/monkeypatch.html}{monkeypatch}
+\end{itemize}
+\end{frame}
+\end{document}

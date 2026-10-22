@@ -1,0 +1,22 @@
+Let's now design concrete syntax for
+LAMBDA (in which source code of LAMBDA is written).
+
+Here are some examples:
+
+fact =
+fix f(x) =>
+  if (x > 0) then x * f(x-1) else 1
+
+fact =
+lam (n) =>
+let
+  loop = fix f(xr) =>
+    let
+      x = xr.0
+      r = xr.1
+    in
+      if x < n then f(x+1, (x+1) * r) else r
+    end
+in
+  loop(n, 1)
+end

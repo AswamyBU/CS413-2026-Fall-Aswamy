@@ -1,0 +1,85 @@
+# List library: load with d0cls_parse, then evaluate using D0Elets.
+# Multiple arguments are passed as one tuple: list_append(xs, ys).
+# Callbacks to folds take a tuple: f(acc, x) or f(x, acc).
+# Primitives: list_nil(), list_cons(x, xs), list_nilq(xs),
+#             list_head(xs), list_tail(xs).
+# Head and tail require a nonempty list.
+
+list_singleton = lam (x) => list_cons(x, list_nil())
+
+# list_print(xs): print [value, ...] followed by a newline; return ().
+list_print = lam (xs) => print(xs)
+
+list_length = lam (xs) =>
+  let
+    loop = fix loop(p) =>
+      if list_nilq(p.0) then p.1
+      else loop(list_tail(p.0), p.1 + 1)
+  in
+    loop(xs, 0)
+  end
+
+list_reverse = lam (xs) =>
+  let
+    loop = fix loop(p) =>
+      if list_nilq(p.0) then p.1
+      else loop(list_tail(p.0), list_cons(list_head(p.0), p.1))
+  in
+    loop(xs, list_nil())
+  end
+
+list_append = fix append(p) =>
+  if list_nilq(p.0) then p.1
+  else list_cons(list_head(p.0), append(list_tail(p.0), p.1))
+
+list_concat = fix concat(xss) =>
+  if list_nilq(xss) then list_nil()
+  else list_append(list_head(xss), concat(list_tail(xss)))
+
+# list_map(xs, f), list_filter(xs, predicate)
+list_map = fix map(p) =>
+  if list_nilq(p.0) then list_nil()
+  else list_cons(p.1(list_head(p.0)), map(list_tail(p.0), p.1))
+
+list_filter = fix filter(p) =>
+  if list_nilq(p.0) then list_nil()
+  else if p.1(list_head(p.0))
+       then list_cons(list_head(p.0), filter(list_tail(p.0), p.1))
+       else filter(list_tail(p.0), p.1)
+
+# list_foldleft(xs, initial, f), list_foldright(xs, initial, f)
+list_foldleft = fix fold(p) =>
+  if list_nilq(p.0) then p.1
+  else fold(list_tail(p.0), p.2(p.1, list_head(p.0)), p.2)
+
+list_foldright = fix fold(p) =>
+  if list_nilq(p.0) then p.1
+  else p.2(list_head(p.0), fold(list_tail(p.0), p.1, p.2))
+
+# Predicates stop as soon as the result is known.
+list_exists = fix exists(p) =>
+  if list_nilq(p.0) then false
+  else if p.1(list_head(p.0)) then true
+       else exists(list_tail(p.0), p.1)
+
+list_forall = fix forall(p) =>
+  if list_nilq(p.0) then true
+  else if p.1(list_head(p.0)) then forall(list_tail(p.0), p.1)
+       else false
+
+# list_take(xs, n), list_drop(xs, n): n <= 0 means take none/drop none.
+# Counts exceeding the length are capped at the length.
+list_take = fix take(p) =>
+  if p.1 <= 0 then list_nil()
+  else if list_nilq(p.0) then list_nil()
+       else list_cons(list_head(p.0), take(list_tail(p.0), p.1 - 1))
+
+list_drop = fix drop(p) =>
+  if p.1 <= 0 then p.0
+  else if list_nilq(p.0) then p.0
+       else drop(list_tail(p.0), p.1 - 1)
+
+# list_range(lo, hi) contains lo, lo+1, ..., hi-1; empty when lo >= hi.
+list_range = fix range(p) =>
+  if p.0 >= p.1 then list_nil()
+  else list_cons(p.0, range(p.0 + 1, p.1))

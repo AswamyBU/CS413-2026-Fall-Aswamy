@@ -1,0 +1,21 @@
+# Typed LAMBDA sample: recursive functions, typed lists, tuples, and options.
+
+fact : int -> int =
+  fix fact(n: int): int =>
+    if n <= 1 then 1 else n * fact(n - 1);
+
+numbers : List[int] =
+  list_cons(1, list_cons(2, list_cons(3, list_nil())));
+
+sum_list : List[int] -> int =
+  fix sum_list(xs: List[int]): int =>
+    if list_nilq(xs) then 0
+    else list_head(xs) + sum_list(list_tail(xs));
+
+double : int -> int = lam (n : int) => n * 2;
+
+maybe_sum : Option[int] = optn_cons(sum_list(numbers));
+
+report : (int, int, bool) =
+  (fact(5), double(sum_list(numbers)),
+   if optn_nilq(maybe_sum) then false else optn_get(maybe_sum) == 6);

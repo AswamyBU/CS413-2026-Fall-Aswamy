@@ -1,0 +1,15 @@
+# A function can be passed as a value. apply_twice expects both a callback
+# and an integer, packed into a tuple because calls take one argument.
+
+increment : int -> int = lam (n : int) => n + 1;
+
+apply_twice : (int -> int, int) -> int =
+  lam (p : (int -> int, int)) => p.0(p.0(p.1));
+
+choose : (bool, int, int) -> int =
+  lam (p : (bool, int, int)) =>
+    if p.0 then p.1 else p.2;
+
+twice : int = apply_twice(increment, 40);
+selected : int = choose(true, twice, 0);
+answer : (int, bool) = (selected, selected == 42);

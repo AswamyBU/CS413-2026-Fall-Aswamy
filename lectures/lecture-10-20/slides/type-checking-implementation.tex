@@ -1,0 +1,267 @@
+\documentclass[aspectratio=169,11pt]{beamer}
+\usetheme{Madrid}
+\usecolortheme{seahorse}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{listings}
+\lstset{basicstyle=\ttfamily\small, columns=fullflexible, keepspaces=true,
+  showstringspaces=false, frame=single, xleftmargin=2pt, xrightmargin=2pt}
+\newcommand{\Int}{\mathsf{int}}
+\newcommand{\Bool}{\mathsf{bool}}
+\newcommand{\ListT}[1]{\mathsf{List}[#1]}
+\newcommand{\OptionT}[1]{\mathsf{Option}[#1]}
+\title[Typed LAMBDA]{Type-checking in LAMBDA}
+\subtitle{How the implementation represents and checks types}
+\author{CS 413}
+\date{October 20, 2026}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\begin{frame}{What this implementation checks}
+\begin{itemize}
+  \item Source annotations give every bound variable a type.
+  \item The parser stores those annotations in the expression tree.
+  \item A recursive checker walks the tree and checks each operation.
+  \item A small unifier connects unknown element types for empty lists and options.
+\end{itemize}
+\begin{block}{The central question}
+Given the expression tree and the types of names in scope, can every part of this expression be used consistently?
+\end{block}
+\end{frame}
+
+\begin{frame}[fragile]{Types are written at binders}
+\begin{columns}[T]
+\column{.53\textwidth}
+\begin{lstlisting}
+let
+  inc : int -> int =
+    lam (n : int) => n + 1
+  answer : int = inc(41)
+in
+  answer
+end
+\end{lstlisting}
+\column{.42\textwidth}
+The annotation on \texttt{inc} describes its whole function type. The lambda annotation gives the parameter type. The let annotation states what the initializer must produce.
+\medskip
+
+Each binder is explicit, including recursive function names and their parameters.
+\end{columns}
+\end{frame}
+
+\begin{frame}{The type vocabulary}
+\begin{columns}[T]
+\column{.47\textwidth}
+\[
+T ::= \Int \mid \Bool \mid T\to T \mid (T_1,\ldots,T_n)
+\]
+\[
+\phantom{T ::=}\mid \ListT{T} \mid \OptionT{T}
+\]
+\column{.49\textwidth}
+\begin{itemize}
+  \item Function: \texttt{int -> bool}
+  \item Tuple: \texttt{(int, bool)}
+  \item Empty tuple: \texttt{unit}
+  \item List and option: \texttt{List[int]}, \texttt{Option[bool]}
+\end{itemize}
+\end{columns}
+\bigskip
+Lists and options are homogeneous: every element or wrapped value has the same type.
+\end{frame}
+
+\begin{frame}{Types have matching data structures}
+The checker represents types as Python objects:
+\begin{center}
+\begin{tabular}{ll}
+\textbf{Type object} & \textbf{Meaning} \\
+\hline
+\texttt{TInt()} & integer \\
+\texttt{TBool()} & boolean \\
+\texttt{TFun(argument, result)} & function type \\
+\texttt{TTuple(items)} & tuple with component types \\
+\texttt{TList(element)} & homogeneous list \\
+\texttt{TOption(element)} & option value \\
+\texttt{TMeta(id)} & temporary unknown type \\
+\end{tabular}
+\end{center}
+\medskip
+For example, \texttt{int -> List[bool]} is \texttt{TFun(TInt(), TList(TBool()))}.
+\end{frame}
+
+\begin{frame}{The AST keeps each annotation}
+The parser turns source into dataclass nodes. The checker reads their fields.
+\begin{columns}[T]
+\column{.49\textwidth}
+\begin{block}{Lambda}
+\texttt{D0Elam(arg1, arg2, ann)}
+\begin{itemize}
+  \item \texttt{arg1}: parameter name
+  \item \texttt{arg2}: body
+  \item \texttt{ann}: parameter type
+\end{itemize}
+\end{block}
+\column{.49\textwidth}
+\begin{block}{Recursive function}
+\texttt{D0Efix(arg1, arg2, arg3, ann, parameter\_type)}
+\begin{itemize}
+  \item function name and parameter name
+  \item body
+  \item declared function and parameter types
+\end{itemize}
+\end{block}
+\end{columns}
+Let declarations similarly store their declared type alongside the initializer.
+\end{frame}
+
+\begin{frame}{Parsing annotations}
+The parser handles types with a small recursive-descent routine:
+\begin{enumerate}
+  \item Read a type atom: \texttt{int}, \texttt{bool}, a tuple, \texttt{List[T]}, or \texttt{Option[T]}.
+  \item If an arrow follows, parse the result type recursively.
+  \item Build a \texttt{TFun} node. Recursion makes arrows associate right.
+\end{enumerate}
+\begin{exampleblock}{Right-associative arrows}
+\texttt{int -> bool -> int} means \texttt{int -> (bool -> int)}.
+\end{exampleblock}
+Malformed syntax, including a missing annotation, is rejected before type-checking begins.
+\end{frame}
+
+\begin{frame}{The environment is a type lookup table}
+\[
+\Gamma = \{\texttt{inc}:\Int\to\Int,\quad \texttt{xs}:\ListT{\Int}\}
+\]
+\begin{itemize}
+  \item Checking a variable looks up its name in $\Gamma$.
+  \item Checking a lambda adds its parameter and annotation for the body.
+  \item Checking a let initializer uses the current environment.
+  \item After the initializer checks, the new name and declared type enter the environment for later declarations.
+\end{itemize}
+\begin{block}{Sequential scope}
+In \texttt{let x : int = 4 y : int = x + 1 in y end}, the first \texttt{x} is available in the initializer for \texttt{y}.
+\end{block}
+\end{frame}
+
+\begin{frame}{The checker follows the expression tree}
+The nested \texttt{check(expr, env)} function handles one AST form at a time.
+\begin{columns}[T]
+\column{.49\textwidth}
+\textbf{Examples}
+\begin{itemize}
+  \item integer literal returns \texttt{TInt}
+  \item variable returns its environment type
+  \item addition checks two integers
+  \item comparison checks two integers and returns boolean
+\end{itemize}
+\column{.49\textwidth}
+\textbf{Conditional}
+\[
+\frac{c:\Bool\quad a:T\quad b:T}
+     {\mathsf{if}\ c\ \mathsf{then}\ a\ \mathsf{else}\ b:T}
+\]
+The implementation checks the condition, checks both branches, then unifies their types.
+\end{columns}
+\end{frame}
+
+\begin{frame}{Function application creates a type constraint}
+For an application \texttt{f(arg)}, the checker:
+\begin{enumerate}
+  \item checks the type of \texttt{f}
+  \item checks the type of \texttt{arg}
+  \item requires \texttt{f} to have type \texttt{argumentType -> resultType}
+\end{enumerate}
+\begin{exampleblock}{A valid call}
+If \texttt{inc : int -> int}, then \texttt{inc(41) : int}.
+\end{exampleblock}
+\begin{alertblock}{A rejected call}
+\texttt{inc(true)} creates the constraint \texttt{int = bool}, which cannot be solved.
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{Unification fills in unknown element types}
+\texttt{list\_nil()} has no element to inspect, so the checker gives it a fresh type variable, say $\alpha$.
+\[
+\texttt{list\_nil()} : \mathsf{List}[\alpha]
+\]
+In \texttt{list\_cons(4, list\_nil())}, the integer head constrains $\alpha$ to \texttt{int}. The result is \texttt{List[int]}.
+\begin{itemize}
+  \item \texttt{TMeta(id)} represents a fresh unknown.
+  \item Unification records substitutions from unknowns to known types.
+  \item An occurs check prevents circular types such as a type being a list of itself.
+\end{itemize}
+The same mechanism handles \texttt{optn\_nil()} and the result of \texttt{list\_head}.
+\end{frame}
+
+\begin{frame}[fragile]{Checking recursion}
+\begin{lstlisting}
+fact : int -> int =
+  fix fact(n: int): int =>
+    if n <= 1 then 1 else n * fact(n - 1)
+\end{lstlisting}
+The checker verifies three things:
+\begin{enumerate}
+  \item The recursive name \texttt{fact} has the declared type \texttt{int -> int} inside its body.
+  \item The parameter \texttt{n} has type \texttt{int}.
+  \item The body has the declared result type \texttt{int}.
+\end{enumerate}
+A recursive call is checked like any other function application.
+\end{frame}
+
+\begin{frame}[fragile]{A worked example from the test programs}
+\begin{lstlisting}
+apply_twice : (int -> int, int) -> int =
+  lam (p : (int -> int, int)) => p.0(p.0(p.1))
+\end{lstlisting}
+The environment inside the body contains:
+\[
+\texttt{p}:(\Int\to\Int,\Int)
+\]
+So projection \texttt{p.0} has type \texttt{int -> int} and \texttt{p.1} has type \texttt{int}. Applying the function twice still returns \texttt{int}, which matches the annotation.
+\end{frame}
+
+\begin{frame}{Type errors point to the violated constraint}
+The examples in \texttt{mytest/type\_error\_*.lam} isolate common failures:
+\begin{itemize}
+  \item \texttt{is\_small(true)}: expected integer argument, got boolean.
+  \item \texttt{if 1 then ...}: condition must be boolean.
+  \item \texttt{if true then 10 else false}: branch types disagree.
+  \item \texttt{list\_cons(true, list\_cons(1, ...))}: list elements disagree.
+  \item Recursive body returns boolean where its annotation promises integer.
+\end{itemize}
+The exception is \texttt{TypeCheckError}, a subtype of Python's \texttt{TypeError}.
+\end{frame}
+
+\begin{frame}[fragile]{Using the checker}
+\begin{lstlisting}
+from pathlib import Path
+from lambda2 import d0cls_parse, d0cls_typecheck
+from lambda2 import d0exp_parse_and_typecheck
+
+decls = d0cls_parse(Path('mytest/examples.lam').read_text())
+d0cls_typecheck(decls)
+
+expr, typ = d0exp_parse_and_typecheck('1 + 2')
+\end{lstlisting}
+For a complete program, call the checker before the evaluator. The evaluator retains dynamic checks, but does not invoke the static checker automatically.
+\end{frame}
+
+\begin{frame}{Scope and limits}
+\begin{itemize}
+  \item The checker is monomorphic: each let-bound name has one type.
+  \item Bound variables are annotated; there is no type inference for parameters.
+  \item Empty list and option types are solved from their uses.
+  \item \texttt{list\_head}, \texttt{optn\_get}, and division can still fail at runtime on empty values or a zero divisor.
+  \item Type-checking does not prove termination or program intent.
+\end{itemize}
+\begin{block}{Takeaway}
+The implementation turns type rules into a recursive AST walk, with unification where an element type is initially unknown.
+\end{block}
+\end{frame}
+
+\end{document}

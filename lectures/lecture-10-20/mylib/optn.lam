@@ -1,0 +1,54 @@
+# Option library: load with d0cls_parse, then evaluate using D0Elets.
+# An option contains either no value or one value of any type.
+# Primitives: optn_nil(), optn_cons(x), optn_nilq(opt), optn_get(opt).
+# optn_get requires a nonempty option. Multiple arguments use a tuple.
+# This library has no dependency on list.lam.
+
+optn_someq = lam (opt) =>
+  if optn_nilq(opt) then false else true
+
+optn_length = lam (opt) =>
+  if optn_nilq(opt) then 0 else 1
+
+# optn_get_default(opt, default): the default is evaluated eagerly.
+optn_get_default = lam (p) =>
+  if optn_nilq(p.0) then p.1 else optn_get(p.0)
+
+# optn_get_else(opt, thunk): call thunk() only when the option is empty.
+optn_get_else = lam (p) =>
+  if optn_nilq(p.0) then p.1() else optn_get(p.0)
+
+# optn_map(opt, f): wrap the transformed value in an option.
+optn_map = lam (p) =>
+  if optn_nilq(p.0) then optn_nil()
+  else optn_cons(p.1(optn_get(p.0)))
+
+# optn_bind(opt, f): f must return an option; do not wrap its result.
+optn_bind = lam (p) =>
+  if optn_nilq(p.0) then optn_nil()
+  else p.1(optn_get(p.0))
+
+# optn_filter(opt, predicate): retain a value only if the predicate is true.
+optn_filter = lam (p) =>
+  if optn_nilq(p.0) then optn_nil()
+  else if p.1(optn_get(p.0)) then p.0 else optn_nil()
+
+# optn_fold(opt, default, f): return default for none, f(value) for some.
+# The default is eager; f is called only for a nonempty option.
+optn_fold = lam (p) =>
+  if optn_nilq(p.0) then p.1 else p.2(optn_get(p.0))
+
+optn_exists = lam (p) =>
+  if optn_nilq(p.0) then false else p.1(optn_get(p.0))
+
+optn_forall = lam (p) =>
+  if optn_nilq(p.0) then true else p.1(optn_get(p.0))
+
+# optn_or_else(opt, thunk): thunk() must return an option.
+optn_or_else = lam (p) =>
+  if optn_nilq(p.0) then p.1() else p.0
+
+# optn_to_list(opt): produce an empty or singleton list.
+optn_to_list = lam (opt) =>
+  if optn_nilq(opt) then list_nil()
+  else list_cons(optn_get(opt), list_nil())

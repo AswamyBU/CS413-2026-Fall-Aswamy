@@ -1,0 +1,2 @@
+# Expected type error: the two branches of an if must have the same type.
+bad_branches : int = if true then 10 else false;
