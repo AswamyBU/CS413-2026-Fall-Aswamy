@@ -1,0 +1,742 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Compiling Extended LAMBDA</title>
+<!--
+  Editable source for slides.pdf. Each <section> is one 16:9 slide.
+  Export (from assigns/06, Chrome or Edge):
+    chrome --headless --no-pdf-header-footer --print-to-pdf=MySolution/slides.pdf MySolution/slides.html
+-->
+<style>
+  @page { size: 1280px 720px; margin: 0; }
+  :root {
+    --ink: #1d2433; --muted: #5b6577; --accent: #2f5bd3; --accent2: #c2410c;
+    --ok: #15803d; --bg: #ffffff; --panel: #f3f5f9; --line: #d9dee8;
+    --code: #0f172a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink);
+    font-family: "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { counter-reset: slide; }
+  section {
+    width: 1280px; height: 720px; position: relative; overflow: hidden;
+    padding: 56px 72px 60px; page-break-after: always; break-after: page;
+    counter-increment: slide; display: flex; flex-direction: column;
+  }
+  section:last-child { page-break-after: auto; break-after: auto; }
+  section::before { content: ""; position: absolute; left: 0; top: 0; width: 100%;
+    height: 8px; background: linear-gradient(90deg, var(--accent), #6d8ff0); }
+  section::after { content: counter(slide); position: absolute; right: 40px; bottom: 24px;
+    font-size: 15px; color: var(--muted); }
+  .foot { position: absolute; left: 72px; bottom: 24px; font-size: 15px; color: var(--muted); }
+  h1 { font-size: 46px; margin: 0 0 12px; letter-spacing: -0.5px; }
+  h2 { font-size: 36px; margin: 0 0 6px; letter-spacing: -0.3px; }
+  .kicker { font-size: 16px; text-transform: uppercase; letter-spacing: 2px;
+    color: var(--accent); font-weight: 600; margin-bottom: 6px; }
+  .sub { font-size: 20px; color: var(--muted); margin: 0 0 22px; }
+  p, li { font-size: 21px; line-height: 1.45; }
+  ul { margin: 6px 0; padding-left: 26px; }
+  li { margin: 5px 0; }
+  code, pre, .mono { font-family: "Cascadia Code", Consolas, "SFMono-Regular", Menlo, monospace;
+    font-variant-ligatures: none; font-feature-settings: "calt" 0, "liga" 0; }
+  code { background: var(--panel); padding: 1px 6px; border-radius: 4px; font-size: 0.9em; }
+  pre { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px 18px; margin: 8px 0; font-size: 17px; line-height: 1.45;
+    white-space: pre-wrap; color: var(--code); }
+  pre.small { font-size: 14.5px; }
+  pre.tiny { font-size: 12.5px; line-height: 1.35; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; flex: 1; min-height: 0; }
+  .cols3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 22px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 16px 20px; }
+  .card h3 { margin: 0 0 8px; font-size: 21px; color: var(--accent); }
+  .card p, .card li { font-size: 18px; }
+  table { border-collapse: collapse; width: 100%; font-size: 17px; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+  th { background: var(--panel); font-weight: 600; }
+  table.tight th, table.tight td { padding: 4px 10px; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .pass { color: var(--ok); font-weight: 600; }
+  .warn { color: var(--accent2); font-weight: 600; }
+  .accent { color: var(--accent); font-weight: 600; }
+  .callout { border-left: 5px solid var(--accent); background: #eef3ff; padding: 12px 18px;
+    border-radius: 6px; font-size: 20px; margin-top: 10px; }
+  .callout.orange { border-color: var(--accent2); background: #fff4ec; }
+  .flow { display: flex; align-items: center; gap: 10px; margin: 18px 0 8px; flex-wrap: nowrap; }
+  .box { border: 2px solid var(--accent); border-radius: 10px; padding: 10px 12px;
+    text-align: center; font-size: 17px; background: #fff; min-width: 120px; }
+  .box b { display: block; font-size: 18px; }
+  .box small { color: var(--muted); font-size: 14px; }
+  .box.src { border-color: #64748b; }
+  .box.out { border-color: var(--ok); }
+  .arrow { font-size: 26px; color: var(--muted); }
+  .title-slide { justify-content: center; }
+  .title-slide h1 { font-size: 58px; line-height: 1.12; }
+  .big { font-size: 64px; font-weight: 700; color: var(--accent); line-height: 1; }
+  .stat { text-align: center; }
+  .stat .label { font-size: 17px; color: var(--muted); margin-top: 6px; }
+  .tag { display: inline-block; font-size: 14px; padding: 2px 8px; border-radius: 999px;
+    background: #e7ecfb; color: var(--accent); font-weight: 600; margin-right: 6px; }
+  .grow { flex: 1; }
+</style>
+</head>
+<body>
+
+<!-- 1 -->
+<section class="title-slide">
+  <div class="kicker">CS413 · Fall 2026 · Midterm 1 (Assignment 6)</div>
+  <h1>Compiling Extended LAMBDA<br>into Pure Lambda-Calculus</h1>
+  <p class="sub" style="font-size:24px">Numbers, booleans, pairs, <code>let</code>, <code>if</code>, and recursion,
+    translated into nothing but variables, one-parameter lambdas, and applications</p>
+  <p style="font-size:26px;font-weight:600;margin:4px 0 0">Arnav Swamy</p>
+  <div class="flow" style="margin-top:30px">
+    <div class="box src"><b>Source AST</b><small>lambda1_vp.py</small></div><span class="arrow">→</span>
+    <div class="box"><b>Compiler</b><small>visitor</small></div><span class="arrow">→</span>
+    <div class="box"><b>Pure term</b><small>Var · Lam · App</small></div><span class="arrow">→</span>
+    <div class="box"><b>CBV reducer</b><small>beta-value steps</small></div><span class="arrow">→</span>
+    <div class="box out"><b>Observer</b><small>decoded answer</small></div>
+  </div>
+</section>
+
+<!-- 2 -->
+<section>
+  <div class="kicker">Overview</div>
+  <h2>The goal</h2>
+  <p class="sub">Translate programs, don't evaluate them and encode the answers.</p>
+  <div class="cols">
+    <div>
+      <ul>
+        <li>Input: an extended-LAMBDA <b>source AST</b> built in Python (no parser needed)</li>
+        <li>Output: a term in Church's <b>pure, untyped λ-calculus</b></li>
+        <li>Run the output with a <b>bounded, weak, left-to-right call-by-value</b> reducer</li>
+        <li><b>Decode</b> the result with pure observation contexts</li>
+        <li>Check it against the <b>same evaluator</b> run on the source, and against an explicit expected answer</li>
+      </ul>
+    </div>
+    <div>
+      <div class="card">
+        <h3>Ground rules from the spec</h3>
+        <ul>
+          <li>Compilation never calls the evaluator</li>
+          <li>Generated code contains no source primitives: every number and operator is a λ-term</li>
+          <li>The reducer never recognises Church encodings or uses Python arithmetic</li>
+          <li>One evaluator handles both languages</li>
+        </ul>
+      </div>
+      <div class="callout" style="margin-top:16px"><span class="mono">fact 4</span> is computed purely by beta reduction, yet decodes to <b>24</b>.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 3 -->
+<section>
+  <div class="kicker">Languages</div>
+  <h2>Source language</h2>
+  <p class="sub">The supplied AST from Assignment 5, used unchanged</p>
+  <div class="cols">
+    <table>
+      <tr><th>Constructor</th><th>Meaning</th></tr>
+      <tr><td><code>D0Eint(n)</code></td><td>natural number, n ≥ 0</td></tr>
+      <tr><td><code>D0Ebtf(b)</code></td><td>true / false</td></tr>
+      <tr><td><code>D0Evar</code>, <code>D0Elam</code>, <code>D0Eapp</code></td><td>variables, functions, application</td></tr>
+      <tr><td><code>D0Eif0(c, t, f)</code></td><td>boolean conditional</td></tr>
+      <tr><td><code>D0Elet(x, e1, e2)</code></td><td>non-recursive binding</td></tr>
+      <tr><td><code>D0Epair</code>, <code>D0Epfst</code>, <code>D0Epsnd</code></td><td>pairs and projections</td></tr>
+      <tr><td><code>D0Efix(f, x, e)</code></td><td>recursive function</td></tr>
+      <tr><td><code>D0Eop1("not", e)</code></td><td>negation</td></tr>
+      <tr><td><code>D0Eop2(op, e1, e2)</code></td><td>binary operators →</td></tr>
+    </table>
+    <div>
+      <div class="card">
+        <h3>Operators</h3>
+        <p class="mono" style="font-size:18px;margin:4px 0;white-space:nowrap">+ &nbsp;- &nbsp;* &nbsp;&lt; &nbsp;&lt;= &nbsp;&gt; &nbsp;&gt;= &nbsp;== &nbsp;!= &nbsp;and &nbsp;or</p>
+        <ul>
+          <li><code>-</code> is truncated: <code>2 - 5 = 0</code></li>
+          <li><code>and</code> / <code>or</code> short-circuit left to right</li>
+        </ul>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <h3>Semantics</h3>
+        <ul>
+          <li>Left-to-right <b>call-by-value</b> everywhere</li>
+          <li><code>let</code> binds only in its body, not its initializer</li>
+          <li><code>fix f(f)</code>: the parameter shadows the function name</li>
+          <li>Negative literals, <code>/</code>, and other operators are <b>compile errors</b>, even in dead code</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 4 -->
+<section>
+  <div class="kicker">Languages</div>
+  <h2>Target language: pure λ-calculus</h2>
+  <p class="sub">A separate AST with exactly three forms (<code>target.py</code>)</p>
+  <div class="cols">
+    <div>
+      <pre style="font-size:22px">Term ::= Var(name)
+       | Lam(name, Term)
+       | App(Term, Term)</pre>
+      <p>Printed as <code>x</code>, <code>(lam x. body)</code>, <code>(fn arg)</code>.</p>
+      <ul>
+        <li>Immutable (frozen dataclasses)</li>
+        <li>Free variables cached per node</li>
+        <li>Unchanged subterms are <b>shared</b> by substitution, not copied</li>
+        <li><code>alpha_equiv</code> and <code>is_pure</code> for testing</li>
+      </ul>
+    </div>
+    <div>
+      <div class="card">
+        <h3>Capture-avoiding substitution</h3>
+        <pre>(lam y. x)[x := y]
+  = lam y_1. y        <span style="color:#15803d">✓ y stays free</span>
+  ≠ lam y. y          <span style="color:#c2410c">✗ captured</span></pre>
+        <p>Renaming policy (from my Assignment 5): try <code>y_1</code>, <code>y_2</code>, …
+          and take the first name not used anywhere in the term, the replacement, or the target.</p>
+      </div>
+      <div class="callout">During closed execution every substituted value is closed, so renaming
+        <b>never</b> happens there, and it costs nothing.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 5 -->
+<section>
+  <div class="kicker">Architecture</div>
+  <h2>Modules and dependencies</h2>
+  <p class="sub">Compiler, encodings, evaluator, and demo are kept separate</p>
+  <div class="cols" style="grid-template-columns: 1.15fr 1fr">
+    <table>
+      <tr><th>Module</th><th>Role</th></tr>
+      <tr><td><code>target.py</code></td><td>Var/Lam/App, printer, FV, substitution</td></tr>
+      <tr><td><code>church.py</code></td><td>closed Church-encoding combinators</td></tr>
+      <tr><td><code>source_syntax.py</code></td><td>source AST import, printer, substitution</td></tr>
+      <tr><td><code>compiler.py</code></td><td><code>CompileVisitor</code>, <code>compile_expr</code></td></tr>
+      <tr><td><code>evaluator.py</code></td><td>the one shared CBV machine</td></tr>
+      <tr><td><code>observe.py</code></td><td>nat / bool / pair decoders</td></tr>
+      <tr><td><code>pipeline.py</code></td><td>compile → execute → observe</td></tr>
+      <tr><td><code>examples.py</code>, <code>demo.py</code></td><td>demonstration programs and CLI</td></tr>
+      <tr><td><code>TEST/</code></td><td>113 unittest tests</td></tr>
+    </table>
+    <div>
+      <svg viewBox="0 0 480 360" width="100%" style="max-height:400px">
+        <defs><marker id="ah" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+          <path d="M0,0 L10,4 L0,8 z" fill="#5b6577"/></marker></defs>
+        <g font-family="Consolas, monospace" font-size="15" text-anchor="middle">
+          <rect x="170" y="10" width="140" height="40" rx="8" fill="#fff" stroke="#15803d" stroke-width="2"/>
+          <text x="240" y="35">pipeline.py</text>
+          <rect x="20" y="120" width="140" height="40" rx="8" fill="#fff" stroke="#2f5bd3" stroke-width="2"/>
+          <text x="90" y="145">compiler.py</text>
+          <rect x="320" y="120" width="140" height="40" rx="8" fill="#fff" stroke="#2f5bd3" stroke-width="2"/>
+          <text x="390" y="145">evaluator.py</text>
+          <rect x="20" y="220" width="140" height="40" rx="8" fill="#fff" stroke="#2f5bd3" stroke-width="2"/>
+          <text x="90" y="245">church.py</text>
+          <rect x="170" y="300" width="140" height="40" rx="8" fill="#fff" stroke="#2f5bd3" stroke-width="2"/>
+          <text x="240" y="325">target.py</text>
+          <rect x="320" y="220" width="140" height="40" rx="8" fill="#fff" stroke="#2f5bd3" stroke-width="2"/>
+          <text x="390" y="245">source_syntax</text>
+        </g>
+        <g stroke="#5b6577" stroke-width="2" fill="none" marker-end="url(#ah)">
+          <line x1="215" y1="50" x2="110" y2="118"/>
+          <line x1="265" y1="50" x2="370" y2="118"/>
+          <line x1="90" y1="160" x2="90" y2="218"/>
+          <line x1="110" y1="260" x2="200" y2="298"/>
+          <line x1="390" y1="160" x2="390" y2="218"/>
+          <line x1="370" y1="160" x2="270" y2="298"/>
+        </g>
+        <line x1="165" y1="140" x2="315" y2="140" stroke="#c2410c" stroke-width="2.5" stroke-dasharray="7 6"/>
+        <text x="240" y="130" font-size="14" text-anchor="middle" fill="#c2410c" font-family="Segoe UI, sans-serif">no import either way</text>
+      </svg>
+      <p style="font-size:18px;margin-top:0">The evaluator imports neither the compiler nor the Church library; the compiler never imports the evaluator. A test parses the imports to check this.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 6 -->
+<section>
+  <div class="kicker">Evaluation</div>
+  <h2>One evaluator for both languages</h2>
+  <p class="sub">The machine is a <code>D0ExpVisitor</code>; target terms speak the same <code>accept</code> protocol</p>
+  <div class="cols">
+    <div>
+      <pre class="small">class _Machine(D0ExpVisitor):
+    # shared by BOTH languages
+    def visit_var(self, node): ...  # unbound -> error
+    def visit_lam(self, node): ...  # a value
+    def visit_app(self, node): ...  # fn, arg, beta
+
+    # source-only constructors, source rules
+    def visit_int / visit_op2 / visit_if0 /
+        visit_let / visit_pair / visit_fix ...</pre>
+      <ul>
+        <li><code>Var</code>/<code>Lam</code>/<code>App</code> mirror the fields of <code>D0Evar</code>/<code>D0Elam</code>/<code>D0Eapp</code></li>
+        <li>A target term can never reach a source-only method</li>
+        <li>Iterative: a continuation stack, no Python recursion</li>
+      </ul>
+    </div>
+    <div>
+      <div class="card">
+        <h3>Weak, left-to-right call-by-value</h3>
+        <pre>(lam x. body) v  -->  body[x := v]</pre>
+        <ul>
+          <li>Evaluate the function, then the argument, then substitute</li>
+          <li>Never reduce under a lambda; no eta</li>
+        </ul>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <h3>Step budget</h3>
+        <ul>
+          <li>Checked <b>before</b> every beta-value step</li>
+          <li><code>I</code> with budget 0 → value, 0 steps</li>
+          <li><code>I I</code> with budget 0 → exhausted, 0 steps</li>
+          <li><code>I I</code> with budget 1 → value, 1 step</li>
+          <li>Exhaustion ≠ proof of divergence</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 7 -->
+<section>
+  <div class="kicker">Church encodings</div>
+  <h2>Data as functions</h2>
+  <p class="sub">Every combinator in <code>church.py</code> is a <b>closed</b> pure term</p>
+  <div class="cols3">
+    <div class="card">
+      <h3>Booleans</h3>
+      <pre class="small">TRUE  = lam t. lam f. t
+FALSE = lam t. lam f. f
+NOT   = lam b. b FALSE TRUE</pre>
+      <p>A boolean <i>selects</i> one of two arguments.</p>
+    </div>
+    <div class="card">
+      <h3>Naturals</h3>
+      <pre class="small">NUM(0) = lam s. lam z. z
+NUM(2) = lam s. lam z. s (s z)
+SUCC = lam n. lam s. lam z.
+         s (n s z)</pre>
+      <p>n means "apply <code>s</code> n times".</p>
+    </div>
+    <div class="card">
+      <h3>Pairs</h3>
+      <pre class="small">PAIR = lam a. lam b. lam p.
+         p a b
+FST  = lam p. p TRUE
+SND  = lam p. p FALSE</pre>
+      <p>A pair hands both parts to a selector.</p>
+    </div>
+  </div>
+  <div class="callout" style="margin-top:22px">
+    Names like <code>TRUE</code> and <code>PAIR</code> are only Python names. In compiled output they are expanded into full λ-terms.
+    <span class="warn">NUM(0) and FALSE are the same term</span>, so decoding needs an expected kind.
+  </div>
+</section>
+
+<!-- 8 -->
+<section>
+  <div class="kicker">Church encodings</div>
+  <h2>Arithmetic, comparisons, and the predecessor</h2>
+  <div class="cols" style="margin-top:10px">
+    <div>
+      <pre class="small">ADD = lam m. lam n. lam s. lam z. m s (n s z)
+MUL = lam m. lam n. lam s. m (n s)
+SUB = lam m. lam n. n PRED m      (truncated)
+IS_ZERO = lam n. n (lam x. FALSE) TRUE
+
+LEQ m n = IS_ZERO (SUB m n)
+GEQ m n = LEQ n m
+LT  m n = NOT (LEQ n m)
+GT  m n = NOT (LEQ m n)
+EQ  m n = AND (LEQ m n) (LEQ n m)
+NEQ m n = NOT (EQ m n)</pre>
+      <p style="font-size:18px">Every comparison reduces to "is <code>m - n</code> zero?"</p>
+    </div>
+    <div>
+      <div class="card">
+        <h3>Predecessor: Kleene's pair trick</h3>
+        <p>A numeral can apply a function n times, but it can't un-apply one. So count <b>up</b>, carrying the previous value:</p>
+        <pre class="small">STEP' (a, b) = (b, b + 1)
+PRED n = FST (n STEP' (0, 0))</pre>
+        <table style="font-size:17px">
+          <tr><th>steps run</th><th>pair</th><th>FST</th></tr>
+          <tr><td>0</td><td class="mono">(0, 0)</td><td><b>0</b> ← pred 0 = 0</td></tr>
+          <tr><td>1</td><td class="mono">(0, 1)</td><td>0</td></tr>
+          <tr><td>2</td><td class="mono">(1, 2)</td><td>1</td></tr>
+          <tr><td>3</td><td class="mono">(2, 3)</td><td>2</td></tr>
+        </table>
+        <p style="font-size:17px;margin-bottom:0">Under CBV each step runs eagerly, so the cost is linear in n.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 9 -->
+<section>
+  <div class="kicker">Compilation</div>
+  <h2>A compositional visitor</h2>
+  <p class="sub"><code>CompileVisitor</code>: compile the children, then combine them by the constructor</p>
+  <div class="cols">
+    <pre class="small">C[n]                = NUM(n)
+C[true] / C[false]  = TRUE / FALSE
+C[x]                = x
+C[lam x. e]         = lam x. C[e]
+C[e1 e2]            = C[e1] C[e2]
+C[let x = e1 in e2] = (lam x. C[e2]) C[e1]
+C[pair e1 e2]       = PAIR C[e1] C[e2]
+C[fst e] / C[snd e] = FST C[e] / SND C[e]
+C[not e]            = NOT C[e]
+C[e1 op e2]         = OP C[e1] C[e2]
+                      op ∈ + - * &lt; &lt;= &gt; &gt;= == !=
+C[if c then t else f] = (C[c] (lam u. C[t])
+                              (lam v. C[f])) I
+C[e1 and e2] = (C[e1] (lam u. C[e2]) (lam v. FALSE)) I
+C[e1 or e2]  = (C[e1] (lam u. TRUE) (lam v. C[e2])) I
+C[fix f(x). e]      = Z (lam f. lam x. C[e])</pre>
+    <div>
+      <ul>
+        <li><b>let</b> is just an application, so its initializer is evaluated first and is outside the binder's scope</li>
+        <li>Operands are arguments, so they are evaluated left to right</li>
+        <li><b>Unsupported forms</b> raise <code>CompileError</code> wherever they appear, including unselected branches and functions that are never called:</li>
+      </ul>
+      <pre class="small">unsupported binary operator '/' in (4 / 2)
+unsupported negative integer literal -3</pre>
+      <div class="callout">A diverging program like <code>LOOP</code> compiles normally, because compilation never runs code.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 10 -->
+<section>
+  <div class="kicker">Call-by-value compilation</div>
+  <h2>Delayed branches</h2>
+  <div class="cols" style="margin-top:12px">
+    <div>
+      <div class="card" style="border-color:#f3c3a6;background:#fff8f3">
+        <h3 style="color:#c2410c">Naive: apply the boolean to both branches</h3>
+        <pre class="small">C[if c then t else f] = C[c] C[t] C[f]   ✗</pre>
+        <p>Under CBV, arguments are evaluated <b>before</b> the call, so <b>both</b> branches run.
+          <code>if true then 1 else LOOP</code> would never finish.</p>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <h3>Fix: thunks, then force only the chosen one</h3>
+        <pre class="small">(C[c] (lam u. C[t]) (lam v. C[f])) I</pre>
+        <p>Lambdas are already values, so passing them evaluates nothing.
+          The boolean picks one thunk, and applying it to <code>I = lam w. w</code> runs only that branch.</p>
+      </div>
+    </div>
+    <div>
+      <table>
+        <tr><th>Program</th><th>Result</th></tr>
+        <tr><td><code>if true then 1 else LOOP</code></td><td class="pass">1</td></tr>
+        <tr><td><code>false and LOOP</code></td><td class="pass">false</td></tr>
+        <tr><td><code>true or LOOP</code></td><td class="pass">true</td></tr>
+        <tr><td><code>if true then LOOP else 1</code></td><td class="warn">exhausted</td></tr>
+        <tr><td><code>(lam x. 0) LOOP</code></td><td class="warn">exhausted</td></tr>
+        <tr><td><code>let x = LOOP in 2</code></td><td class="warn">exhausted</td></tr>
+        <tr><td><code>fst (pair 2 LOOP)</code></td><td class="warn">exhausted</td></tr>
+      </table>
+      <div class="callout">Only control constructs are delayed. Function arguments, <code>let</code> initializers,
+        and pair components remain <b>strict</b>, exactly as in the source.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 11 -->
+<section>
+  <div class="kicker">Call-by-value compilation</div>
+  <h2>Recursion with the Z combinator</h2>
+  <div class="cols" style="margin-top:12px">
+    <div>
+      <div class="card" style="border-color:#f3c3a6;background:#fff8f3">
+        <h3 style="color:#c2410c">Y loops forever under CBV</h3>
+        <pre class="small">Y = lam g. (lam x. g (x x)) (lam x. g (x x))</pre>
+        <p><code>x x</code> is an argument, so it is evaluated <i>before</i> <code>g</code> gets control, again and again.
+          A test shows that <code>Y G</code> exhausts its budget.</p>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <h3>Z delays the self-application</h3>
+        <pre class="small">Z = lam g. (lam x. g (lam v. x x v))
+            (lam x. g (lam v. x x v))</pre>
+        <p><code>lam v. x x v</code> is a value: it unfolds only when it is called.</p>
+      </div>
+    </div>
+    <div>
+      <pre class="small">C[fix f(x). e] = Z (lam f. lam x. C[e])
+
+Z G  -->*  G F           F = lam v. X X v
+     -->   lam x. C[e][f := F]      ← a value
+
+F a  -->*  (lam x. C[e][f := F]) a
+     -->   C[e][f := F][x := a]</pre>
+      <p>This matches the source rule <code>e[f := fix f(x). e][x := a]</code>.</p>
+      <div class="callout"><b>Coincident binders</b>: <code>fix f(f). f</code> becomes
+        <code>Z (lam f. lam f. f)</code>. The inner binder shadows the outer one, so
+        <code>(fix f(f). f) 3</code> = <b>3</b>.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 12 -->
+<section>
+  <div class="kicker">Scope</div>
+  <h2>Names, freshness, and capture</h2>
+  <div class="cols" style="margin-top:12px">
+    <div>
+      <div class="card">
+        <h3>1 · Library combinators are closed</h3>
+        <p>The compiler only <i>applies</i> them to compiled code and never wraps compiled code in their binders.
+          So <code>s</code>, <code>z</code>, <code>t</code>, <code>f</code>, <code>x</code>, … stay available to source programs.</p>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <h3>2 · Source binders are copied as written</h3>
+        <p>Shadowing, let-initializer scope, and <code>fix f(f)</code> come out right automatically.</p>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <h3>3 · Thunk parameters are fresh</h3>
+        <p>Use <code>u</code>/<code>v</code> unless that name occurs anywhere in the wrapped term, then <code>u_1</code>, <code>u_2</code>, … (deterministic).</p>
+      </div>
+    </div>
+    <div>
+      <pre class="small">if c then u else (v v_1)
+  ⇒ (((c (lam u_1. u))
+         (lam v_2. (v v_1)))
+       (lam w. w))</pre>
+      <p>Free variables are preserved:</p>
+      <pre style="font-size:22px;text-align:center">FV(C[e]) = FV(e)</pre>
+      <ul>
+        <li>Checked on 400 random <b>open</b> source ASTs</li>
+        <li>Source programs that use every library binder name (<code>let s = 2 in s * 3 + s</code>, …) still give the right answers</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 13 -->
+<section>
+  <div class="kicker">Decoding</div>
+  <h2>Observing results without cheating</h2>
+  <p class="sub">Pure observation contexts, run by the same CBV engine with their <b>own</b> budget</p>
+  <div class="cols3">
+    <div class="card">
+      <h3>Natural</h3>
+      <pre class="small">n STEP BASE
+STEP = lam tail. lam c.
+         lam z. c tail
+BASE = lam c. lam z. z</pre>
+      <p>CBV builds a finite spine. Python counts the nodes, up to alpha-renaming.</p>
+    </div>
+    <div class="card">
+      <h3>Boolean</h3>
+      <pre class="small">b MARK_T MARK_F
+MARK_T = lam p.lam q.lam r. p
+MARK_F = lam p.lam q.lam r. q</pre>
+      <p>Python checks which marker came back.</p>
+    </div>
+    <div class="card">
+      <h3>Pair</h3>
+      <pre class="small">FST p  →  observe(kind1)
+SND p  →  observe(kind2)</pre>
+      <p>Evaluate each projection under the budget, then decode recursively.
+        <code>pair (pair 2 true) 3</code> → <b>((2, true), 3)</b></p>
+    </div>
+  </div>
+  <div class="callout" style="margin-top:20px">
+    Status is one of <span class="pass">ok</span>, <span class="warn">exhausted</span>, or <span class="warn">malformed</span>.
+    Results like <code>ADD 2 3</code> still contain redexes inside lambdas, so matching their structure directly would fail. The contexts make them reduce instead.
+  </div>
+</section>
+
+<!-- 14 -->
+<section>
+  <div class="kicker">Walkthrough</div>
+  <h2>Example: <code>2 + 3 * 4</code></h2>
+  <pre class="tiny" style="font-size:14px">(((lam m. (lam n. (lam s. (lam z. ((m s) ((n s) z)))))) (lam s. (lam z. (s (s z)))))
+   (((lam m. (lam n. (lam s. (m (n s))))) (lam s. (lam z. (s (s (s z)))))) (lam s. (lam z. (s (s (s (s z))))))))</pre>
+  <div class="cols" style="margin-top:10px">
+    <div>
+      <ul>
+        <li>The outer application is <span class="accent">ADD</span> applied to <code>NUM(2)</code>, then to the compiled <code>3 * 4</code></li>
+        <li>The inner part is <span class="accent">MUL</span> applied to <code>NUM(3)</code> and <code>NUM(4)</code></li>
+        <li>52 nodes, pure: only Var / Lam / App</li>
+      </ul>
+    </div>
+    <div class="card">
+      <table>
+        <tr><td>Source evaluator</td><td class="num"><b>14</b></td></tr>
+        <tr><td>Execution</td><td class="num">value after <b>4</b> steps</td></tr>
+        <tr><td>Observation (nat)</td><td class="num">ok after <b>25</b> steps</td></tr>
+        <tr><td>Decoded / expected</td><td class="num"><b>14 / 14</b> <span class="pass">PASS</span></td></tr>
+      </table>
+      <p style="font-size:17px;margin-bottom:0">Execution is only 4 steps because <code>ADD</code> and <code>MUL</code> return lambdas right away. The real counting happens during observation.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 15 -->
+<section>
+  <div class="kicker">Walkthrough</div>
+  <h2>A recursive program: factorial 4</h2>
+  <pre class="small">fix fact(n). if n == 0 then 1 else n * fact (n - 1)        applied to 4</pre>
+  <div class="cols" style="margin-top:8px">
+    <div>
+      <p style="margin:4px 0">Compiles to <code>Z (lam fact. lam n. …)</code> applied to <code>NUM(4)</code>:</p>
+      <pre class="tiny">(((lam g. ((lam x. (g (lam v. ((x x) v)))) (lam x. (g (lam v.
+((x x) v)))))) (lam fact. (lam n. ((((((lam m. (lam n. (((lam p.
+(lam q. ((p q) (lam t. (lam f. f))))) (((lam m. (lam n. ((lam n.
+((n (lam x. (lam t. (lam f. f)))) (lam t. (lam f. t)))) ...
+
+          ... 1,100 more characters ...
+
+... (lam s. (lam z. z))) (lam s. (lam z. z))))))) m))) n)
+(lam s. (lam z. (s z)))))))) (lam w. w))))) (lam s. (lam z.
+(s (s (s (s z)))))))</pre>
+      <p style="font-size:17px">Start: <code>Z</code> applied to <code>lam fact. lam n. …</code>, with <code>EQ</code> expanded. End: the dummy <code>(lam w. w)</code> that forces the chosen branch, then the argument <code>NUM(4)</code>. The full term is 1,542 characters and 344 nodes, saved in <code>generated/DEMO-10.txt</code>.</p>
+    </div>
+    <div>
+      <div class="card">
+        <table>
+          <tr><td>Source evaluator</td><td class="num"><b>24</b></td></tr>
+          <tr><td>Execution</td><td class="num"><b>471</b> beta-value steps</td></tr>
+          <tr><td>Observation (nat)</td><td class="num"><b>218</b> steps</td></tr>
+          <tr><td>Decoded / expected</td><td class="num"><b>24 / 24</b> <span class="pass">PASS</span></td></tr>
+        </table>
+      </div>
+      <ul style="margin-top:14px">
+        <li><code>n == 0</code> is <code>EQ</code>: two <code>LEQ</code>s built on truncated subtraction</li>
+        <li>The <code>if</code> keeps the recursive call inside a thunk, so the base case stops recursion</li>
+        <li>Fibonacci 5 → <b>5</b> in 2,021 + 45 steps</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 16 -->
+<section>
+  <div class="kicker">Results</div>
+  <h2>All required demonstrations</h2>
+  <p class="sub" style="margin-bottom:10px"><code>python MySolution/demo.py</code>: execution budget 10,000 and observation budget 10,000 beta-value steps</p>
+  <table style="font-size:15px" class="tight">
+    <tr><th>ID</th><th>Program</th><th class="num">Exec steps</th><th class="num">Obs steps</th><th>Decoded</th><th>Expected</th><th></th></tr>
+    <tr><td>01</td><td><code>2 + 3 * 4</code></td><td class="num">4</td><td class="num">25</td><td>14</td><td>14</td><td class="pass">✓</td></tr>
+    <tr><td>02</td><td><code>2 - 5</code></td><td class="num">87</td><td class="num">2</td><td>0</td><td>0</td><td class="pass">✓</td></tr>
+    <tr><td>03</td><td><code>if 2 &lt;= 3 then 7 else 9</code></td><td class="num">77</td><td class="num">9</td><td>7</td><td>7</td><td class="pass">✓</td></tr>
+    <tr><td>04</td><td><code>let x = 3 in (lam y. x + y) 4</code></td><td class="num">4</td><td class="num">13</td><td>7</td><td>7</td><td class="pass">✓</td></tr>
+    <tr><td>05</td><td><code>fst (pair 2 true)</code></td><td class="num">6</td><td class="num">4</td><td>2</td><td>2</td><td class="pass">✓</td></tr>
+    <tr><td>06</td><td><code>snd (pair 2 true)</code></td><td class="num">6</td><td class="num">2</td><td>true</td><td>true</td><td class="pass">✓</td></tr>
+    <tr><td>07</td><td><code>(lam f. f 3) (lam x. x + 1)</code></td><td class="num">4</td><td class="num">10</td><td>4</td><td>4</td><td class="pass">✓</td></tr>
+    <tr><td>08</td><td><code>if true then 1 else LOOP</code></td><td class="num">3</td><td class="num">3</td><td>1</td><td>1</td><td class="pass">✓</td></tr>
+    <tr><td>09</td><td><code>(lam x. 0) LOOP</code></td><td class="num">10,000</td><td class="num">n/a</td><td>exhausted</td><td>exhaustion</td><td class="pass">✓</td></tr>
+    <tr><td>10</td><td>factorial 4</td><td class="num">471</td><td class="num">218</td><td>24</td><td>24</td><td class="pass">✓</td></tr>
+    <tr><td>11</td><td>Fibonacci 5</td><td class="num">2,021</td><td class="num">45</td><td>5</td><td>5</td><td class="pass">✓</td></tr>
+    <tr><td>12</td><td><code>LOOP</code></td><td class="num">10,000</td><td class="num">n/a</td><td>exhausted</td><td>exhaustion</td><td class="pass">✓</td></tr>
+    <tr><td>13</td><td><code>true and false</code></td><td class="num">3</td><td class="num">2</td><td>false</td><td>false</td><td class="pass">✓</td></tr>
+    <tr><td>14</td><td><code>false or true</code></td><td class="num">3</td><td class="num">2</td><td>true</td><td>true</td><td class="pass">✓</td></tr>
+  </table>
+  <p style="font-size:17px;margin-top:8px">Plus 6 extra examples (nested pairs, <code>fix f(f)</code>, short-circuiting, <code>let x = LOOP in 2</code>, <code>not</code>): <b>20 / 20 match</b>. The whole demo runs in under a second.</p>
+</section>
+
+<!-- 17 -->
+<section>
+  <div class="kicker">Testing</div>
+  <h2>Automated tests: 113 <code>unittest</code> tests, all passing</h2>
+  <div class="cols" style="grid-template-columns: 1.25fr 1fr; margin-top:10px">
+    <table style="font-size:16px">
+      <tr><th>Obligation</th><th>Tests</th></tr>
+      <tr><td>Substitution with shadowing and capture</td><td><code>test_target</code></td></tr>
+      <tr><td>CBV order, zero-step values, budgets, determinism</td><td><code>test_evaluator</code></td></tr>
+      <tr><td>Every encoding, comparison outcome, truth table</td><td><code>test_church</code></td></tr>
+      <tr><td>Every constructor and operator, scope, fix binders</td><td><code>test_compiler</code></td></tr>
+      <tr><td>Divergence: skipped vs. strict positions</td><td><code>test_demos</code></td></tr>
+      <tr><td>Decoders: alpha-renamed, malformed, exhausted</td><td><code>test_observe</code></td></tr>
+      <tr><td>Purity, closed combinators, no evaluator calls</td><td><code>test_compiler</code>, <code>test_church</code></td></tr>
+    </table>
+    <div>
+      <div class="card">
+        <h3>Beyond the hand-written cases</h3>
+        <ul>
+          <li><b>Differential:</b> 120 random well-typed programs. The compiled answer must equal the shared evaluator's source answer</li>
+          <li><b>Property:</b> 400 random open ASTs, checking FV preserved, pure output, input unchanged, deterministic</li>
+          <li><b>No evaluation while compiling:</b> evaluator entry points replaced by doubles that fail if called</li>
+          <li><b>Mutation check:</b> compiling <code>-</code> as <code>+</code>, or reusing a non-fresh thunk name, makes the tests fail</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 18 -->
+<section>
+  <div class="kicker">Correctness</div>
+  <h2>Why the translation preserves meaning</h2>
+  <p class="sub">Claim: for closed, well-typed programs returning naturals, booleans, or finite pairs, observing <code>C[e]</code> gives the source answer, given enough budget</p>
+  <div class="cols">
+    <div>
+      <ul>
+        <li><b>Application:</b> <code>C[e1] C[e2]</code> evaluates function, then argument, then substitutes, the same order as the source. Substitution avoids capture.</li>
+        <li><b>Let:</b> the same argument, since it compiles to an application. The initializer stays outside the binder.</li>
+        <li><b>Conditional:</b> thunks are values. The boolean selects one and <code>I</code> forces it, so the other is never run.</li>
+        <li><b>Recursion:</b> <code>Z G</code> is a lambda value, and each call unfolds exactly one step, matching the source <code>fix</code> rule.</li>
+      </ul>
+    </div>
+    <div>
+      <div class="callout orange" style="margin-top:0">
+        <b>Testing is not proof.</b>
+        <ul style="margin-bottom:0">
+          <li>Tests cover finitely many programs</li>
+          <li>Exhausting the budget is evidence of divergence, not proof</li>
+          <li>Observers check one result at one kind</li>
+        </ul>
+        A full proof would use induction over evaluation and a substitution lemma for <code>C</code>. DESIGN.md sketches it.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 19 -->
+<section>
+  <div class="kicker">Limitations</div>
+  <h2>Limitations and future work</h2>
+  <div class="cols" style="margin-top:14px">
+    <div>
+      <ul>
+        <li><b>Unary numerals and substitution are slow:</b> <code>EQ</code>/<code>LEQ</code> cost O(m·n) steps, and larger factorials need much larger budgets</li>
+        <li><b>Closed terms only</b> for execution and decoding. Open terms are rejected with <code>EvalError</code></li>
+        <li><b>No type checking:</b> <code>1 + true</code> compiles, and its result means nothing</li>
+        <li><b>Decoding checks shape only:</b> for example, <code>lam x. x</code> decodes as the number 1</li>
+        <li><b>Printed terms are long:</b> each combinator is expanded in full, so terms are saved to files</li>
+      </ul>
+    </div>
+    <div>
+      <div class="card">
+        <h3>Next steps</h3>
+        <ul>
+          <li>Binary or Scott numerals for cheaper arithmetic</li>
+          <li>An environment-based machine for speed</li>
+          <li>A source parser so examples can be written as text</li>
+          <li>Signed integers and lists as separately tested extensions</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 20 -->
+<section class="title-slide">
+  <div class="kicker">Summary</div>
+  <h1 style="font-size:46px">Every number, boolean, pair, branch,<br>and recursive call became a λ-term</h1>
+  <div class="cols3" style="margin:22px 0 26px">
+    <div class="stat"><div class="big">20/20</div><div class="label">demonstrations match</div></div>
+    <div class="stat"><div class="big">113</div><div class="label">tests passing</div></div>
+    <div class="stat"><div class="big">0</div><div class="label">source primitives in the output</div></div>
+  </div>
+  <pre style="font-size:18px">cd assigns/06
+python -m unittest discover -s MySolution/TEST -v
+python MySolution/demo.py</pre>
+</section>
+
+</body>
+</html>
