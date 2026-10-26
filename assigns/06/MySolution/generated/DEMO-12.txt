@@ -1,0 +1,1 @@
+(((lam g. ((lam x. (g (lam v. ((x x) v)))) (lam x. (g (lam v. ((x x) v)))))) (lam loop. (lam x. (loop x)))) (lam s. (lam z. z)))
