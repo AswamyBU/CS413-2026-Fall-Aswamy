@@ -1,0 +1,5 @@
+# A let-bound identity function is inferred once and reused at one type.
+id = lam (x) => x;
+first : int = id(40);
+second : int = id(2);
+answer : int = first + second;

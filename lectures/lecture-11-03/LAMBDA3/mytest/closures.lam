@@ -1,0 +1,8 @@
+# A closure keeps the binding that was in scope when it was created.
+let
+  offset : sint = 7;
+  add_offset : sint -> sint = lam (x: sint) => x + offset;
+  pair : (sint, bool) = (add_offset(35), add_offset(0) == 7)
+in
+  (pair.0, pair.1)
+end

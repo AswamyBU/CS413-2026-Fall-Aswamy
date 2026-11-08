@@ -1,0 +1,27 @@
+# Let expressions support sequential bindings, so later values can use earlier ones.
+basic : (int, bool) =
+  let
+    x = 6
+    y = x * 7
+  in
+    (y, y == 42)
+  end;
+
+# A binding can also introduce a function used by later bindings.
+function_value : int =
+  let
+    increment : int -> int = lam (n : int) => n + 1
+    result = increment(41)
+  in
+    result
+  end;
+
+# Recursive functions can be declared locally in a let expression.
+local_factorial : int =
+  let
+    fact : int -> int =
+      fix fact(n: int): int =>
+        if n <= 1 then 1 else n * fact(n - 1)
+  in
+    fact(5)
+  end;

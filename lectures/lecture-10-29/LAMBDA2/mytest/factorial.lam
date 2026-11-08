@@ -1,0 +1,8 @@
+# Recursive factorial, including the base cases and a nontrivial result.
+let
+  fact : int -> int =
+    fix fact(n: int): int =>
+      if n <= 1 then 1 else n * fact(n - 1)
+in
+  (fact(0), fact(1), fact(5), fact(6))
+end

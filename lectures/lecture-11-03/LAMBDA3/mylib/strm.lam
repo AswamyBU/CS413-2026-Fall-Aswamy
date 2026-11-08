@@ -1,0 +1,134 @@
+# Lazy stream library: load with d0cls_parse, then evaluate using D0Elets.
+# A Strm[T] is Lazy[Stcn[T]]. Its next constructor is inspected only when
+# lazy_eval is called; every stream-producing operation leaves its tail lazy.
+# Multiple arguments are passed as tuples, and folds call callbacks with tuples.
+# Primitives: lazy_make, lazy_eval, stcn_nil, stcn_cons,
+#             stcn_nilq, stcn_consq, stcn_head, stcn_tail.
+
+strm_nil[T] : unit -> Strm[T] = lam (u: unit) =>
+  lazy_make(lam (v: unit) => stcn_nil())
+
+strm_cons[T] : (T, Strm[T]) -> Strm[T] = lam (p) =>
+  lazy_make(lam (u: unit) => stcn_cons(p.0, p.1))
+
+strm_nilq[T] : Strm[T] -> bool = lam (xs) => stcn_nilq(lazy_eval(xs))
+
+strm_consq[T] : Strm[T] -> bool = lam (xs) => stcn_consq(lazy_eval(xs))
+
+strm_head[T] : Strm[T] -> T = lam (xs) => stcn_head(lazy_eval(xs))
+
+strm_tail[T] : Strm[T] -> Strm[T] = lam (xs) => stcn_tail(lazy_eval(xs))
+
+strm_singleton[T] : T -> Strm[T] = lam (x) => strm_cons(x, strm_nil())
+
+# Conversion from a finite list. The list is inspected one cell at a time.
+strm_make_list[T] : List[T] -> Strm[T] = fix make(xs) =>
+  lazy_make(lam (u: unit) =>
+    if list_nilq(xs) then stcn_nil()
+    else stcn_cons(list_head(xs), make(list_tail(xs))))
+
+# strm_map(xs, f) transforms each element as its stream cell is demanded.
+strm_map[T, U] : (Strm[T], T -> U) -> Strm[U] = fix map(p) =>
+  lazy_make(lam (u: unit) =>
+    let node : Stcn[T] = lazy_eval(p.0)
+    in
+      if stcn_nilq(node) then stcn_nil()
+      else stcn_cons(p.1(stcn_head(node)), map(stcn_tail(node), p.1))
+    end)
+
+# Filtering searches only as far as needed to produce the next matching cell.
+strm_filter[T] : (Strm[T], T -> bool) -> Strm[T] = fix filter(p) =>
+  lazy_make(lam (u: unit) =>
+    let node : Stcn[T] = lazy_eval(p.0)
+    in
+      if stcn_nilq(node) then stcn_nil()
+      else if p.1(stcn_head(node))
+           then stcn_cons(stcn_head(node), filter(stcn_tail(node), p.1))
+           else lazy_eval(filter(stcn_tail(node), p.1))
+    end)
+
+# Append inspects the second stream only after the first ends.
+strm_append[T] : (Strm[T], Strm[T]) -> Strm[T] = fix append(p) =>
+  lazy_make(lam (u: unit) =>
+    let node : Stcn[T] = lazy_eval(p.0)
+    in
+      if stcn_nilq(node) then lazy_eval(p.1)
+      else stcn_cons(stcn_head(node), append(stcn_tail(node), p.1))
+    end)
+
+# strm_take(xs, n): produce at most n cells; n <= 0 produces an empty stream.
+strm_take[T] : (Strm[T], sint) -> Strm[T] = fix take(p) =>
+  lazy_make(lam (u: unit) =>
+    if p.1 <= 0 then stcn_nil()
+    else
+      let node : Stcn[T] = lazy_eval(p.0)
+      in
+        if stcn_nilq(node) then stcn_nil()
+        else stcn_cons(stcn_head(node), take(stcn_tail(node), p.1 - 1))
+      end)
+
+# Drop n cells lazily; n <= 0 returns the input stream.
+strm_drop[T] : (Strm[T], sint) -> Strm[T] = fix drop(p) =>
+  if p.1 <= 0 then p.0
+  else lazy_make(lam (u: unit) =>
+    let node : Stcn[T] = lazy_eval(p.0)
+    in
+      if stcn_nilq(node) then stcn_nil()
+      else lazy_eval(drop(stcn_tail(node), p.1 - 1))
+    end)
+
+# Fold operations consume a finite stream. Callback argument conventions match
+# list_foldleft/list_foldright in list.lam.
+strm_foldleft[T, A] : (Strm[T], A, (A, T) -> A) -> A = lam (p) =>
+  let
+    loop : (Strm[T], A) -> A = fix loop(q) =>
+      let node : Stcn[T] = lazy_eval(q.0)
+      in
+        if stcn_nilq(node) then q.1
+        else loop(stcn_tail(node), p.2(q.1, stcn_head(node)))
+      end
+  in loop(p.0, p.1) end
+
+strm_foldright[T, A] : (Strm[T], A, (T, A) -> A) -> A = lam (p) =>
+  let
+    loop : Strm[T] -> A = fix loop(xs) =>
+      let node : Stcn[T] = lazy_eval(xs)
+      in
+        if stcn_nilq(node) then p.1
+        else p.2(stcn_head(node), loop(stcn_tail(node)))
+      end
+  in loop(p.0) end
+
+# Predicates short-circuit as soon as their result is determined.
+strm_exists[T] : (Strm[T], T -> bool) -> bool = fix exists(p) =>
+  let node : Stcn[T] = lazy_eval(p.0)
+  in
+    if stcn_nilq(node) then false
+    else if p.1(stcn_head(node)) then true
+         else exists(stcn_tail(node), p.1)
+  end
+
+strm_forall[T] : (Strm[T], T -> bool) -> bool = fix forall(p) =>
+  let node : Stcn[T] = lazy_eval(p.0)
+  in
+    if stcn_nilq(node) then true
+    else if p.1(stcn_head(node)) then forall(stcn_tail(node), p.1)
+         else false
+  end
+
+# Convert a finite stream to a list, preserving order.
+strm_to_list[T] : Strm[T] -> List[T] = lam (xs) =>
+  let
+    loop : Strm[T] -> List[T] = fix loop(stream) =>
+      let node : Stcn[T] = lazy_eval(stream)
+      in
+        if stcn_nilq(node) then list_nil()
+        else list_cons(stcn_head(node), loop(stcn_tail(node)))
+      end
+  in loop(xs) end
+
+# strm_range(lo, hi) is the finite stream lo, lo+1, ..., hi-1.
+strm_range : (sint, sint) -> Strm[sint] = fix range(p) =>
+  lazy_make(lam (u: unit) =>
+    if p.0 >= p.1 then stcn_nil()
+    else stcn_cons(p.0, range(p.0 + 1, p.1)))

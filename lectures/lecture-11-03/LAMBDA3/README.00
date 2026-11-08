@@ -1,0 +1,49 @@
+Add the following type constructor: A1sz
+
+A1sz(T) is for an array of elements of type T where the size of the
+array is attached.
+
+We need to following operations on A1sz:
+
+a1sz_size[T]: A1sz(T) -> sint
+
+a1sz_getat[T]: (A1sz(T), sint) -> T
+Given an array A and an index i, a1sz_getat returns A[i]
+
+a1sz_setat[T]: (A1sz(T), sint, T) -> void
+Given an array A and an index i and an element x, a1sz_setat updates A[i] with x
+
+For creating arrays:
+
+a1sz_make_ncpy[T]: (sint, T) -> A1sz(T)
+Given an integer n (size) and an element x of type T,
+a1sz_make_ncpy returns an array A of size n such that A[i] contains x for each valid index i
+
+a1sz_make_nfun[T]: (sint, sint -> T) -> A1sz(T)
+Given an integer n (size) and an function f from sint to T,
+a1sz_make_nfun returns an array A of size n such that A[i] contains f(i) for each valid index i
+
+Also add support for lazy-evaluation.
+
+Add a type constructor Lazy(T) for a delayed computation returning a value of type T.
+Here are some basic operations for Lazy:
+
+lazy_eval[T]: lazy(T) -> T
+lazy_make[T]: (() -> T) -> lazy(T)
+
+Now add another constructor stcn, which can be defined as follows using ML-like syntax:
+
+datatype
+Stcn(T) =
+| stcn_nil of ()
+| stcn_cons of (T, Strm(T))
+where Strm(T) = Lazy(Stcn(T))
+
+We need the followng basic operations:
+
+stcn_nilq[T]: stcn(T) -> bool
+stcn_consq[T]: stcn(T) -> bool
+
+stcn_head[T]: stcn(T) -> T
+stcn_tail[T]: stcn(T) -> strm(T)
+

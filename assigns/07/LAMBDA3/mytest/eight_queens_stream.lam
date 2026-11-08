@@ -1,0 +1,57 @@
+# Backtracking search for all 8-queens solutions, in a lazy stream.
+# Each solution is a List[sint] with one row per filled column,
+# newest column first. Calling queens_search only constructs a suspended
+# computation. Safety checks and search work start when lazy_eval forces a
+# stream cell. Later branches are explored only as the client forces tails.
+let
+  safe : (sint, sint, List[sint]) -> bool =
+    fix safe(state: (sint, sint, List[sint])): bool =>
+      let
+        row = state.0;
+        distance = state.1;
+        queens = state.2
+      in
+        if list_nilq(queens) then true
+        else
+          let previous = list_head(queens)
+          in
+            if previous == row then false
+            else if previous == row - distance then false
+            else if previous == row + distance then false
+            else safe(row, distance + 1, list_tail(queens))
+          end
+      end;
+  empty : List[sint] = list_nil();
+  stream_nil : unit -> Strm[List[sint]] = lam (u: unit) =>
+    lazy_make(lam (v: unit) => stcn_nil());
+  stream_singleton : List[sint] -> Strm[List[sint]] = lam (solution) =>
+    lazy_make(lam (u: unit) =>
+      stcn_cons(solution, stream_nil()));
+  stream_append : (Strm[List[sint]], Strm[List[sint]]) -> Strm[List[sint]] =
+    fix append(p) =>
+      lazy_make(lam (u: unit) =>
+        let node : Stcn[List[sint]] = lazy_eval(p.0)
+        in
+          if stcn_nilq(node) then lazy_eval(p.1)
+          else
+            stcn_cons(stcn_head(node), append(stcn_tail(node), p.1))
+        end);
+  queens_search : (sint, sint, List[sint]) -> Strm[List[sint]] =
+    fix search(state: (sint, sint, List[sint])): Strm[List[sint]] =>
+      lazy_make(lam (u: unit) =>
+        let
+          column = state.0;
+          row = state.1;
+          queens = state.2
+        in
+          if column == 8 then stcn_cons(queens, stream_nil())
+          else if row >= 8 then stcn_nil()
+          else if safe(row, 1, queens) then
+            lazy_eval(stream_append(
+              search(column + 1, 0, list_cons(row, queens)),
+              search(column, row + 1, queens)))
+          else lazy_eval(search(column, row + 1, queens))
+        end)
+in
+  queens_search(0, 0, empty)
+end

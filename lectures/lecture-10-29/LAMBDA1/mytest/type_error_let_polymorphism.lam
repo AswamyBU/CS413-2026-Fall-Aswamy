@@ -1,0 +1,4 @@
+# Expected type error: id is monomorphic, so its argument cannot be both int and bool.
+id = lam (x) => x;
+integer_result : int = id(1);
+boolean_result : bool = id(true);

@@ -1,0 +1,4 @@
+# Explicit type parameter, modeled on mypy's generic function syntax.
+identity[T] : T -> T = lam (x: T) => x;
+integer_identity : int = identity(42);
+boolean_identity : bool = identity(true);

@@ -1,0 +1,232 @@
+\documentclass[aspectratio=169,10pt]{beamer}
+\usetheme{Boadilla}
+\usecolortheme{default}
+\definecolor{Ink}{HTML}{14233B}
+\definecolor{Blue}{HTML}{2463A6}
+\definecolor{Amber}{HTML}{D88922}
+\definecolor{Paper}{HTML}{F4F6F9}
+\setbeamercolor{normal text}{fg=Ink,bg=white}
+\setbeamercolor{structure}{fg=Blue}
+\setbeamercolor{frametitle}{fg=Ink,bg=white}
+\setbeamercolor{title}{fg=Ink}
+\setbeamercolor{subtitle}{fg=Blue}
+\setbeamercolor{author}{fg=Ink}
+\setbeamercolor{date}{fg=Ink}
+\setbeamercolor{codebox}{fg=Ink,bg=Paper}
+\setbeamercolor{alerted text}{fg=Amber}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+\setbeamersize{text margin left=9mm,text margin right=9mm}
+\setbeamertemplate{itemize item}{\color{Amber}\small$\blacktriangleright$}
+\setbeamertemplate{itemize subitem}{\color{Blue}\scriptsize$\bullet$}
+\usepackage{listings}
+\usepackage{amsmath,amssymb}
+\lstset{basicstyle=\ttfamily\small,columns=fullflexible,keepspaces=true,
+  showstringspaces=false,frame=single,rulecolor=\color{Blue!25},
+  backgroundcolor=\color{Paper},xleftmargin=5pt,xrightmargin=5pt,
+  aboveskip=7pt,belowskip=7pt}
+\newcommand{\meta}[1]{\textcolor{Blue}{\texttt{#1}}}
+\newcommand{\kw}[1]{\textcolor{Amber!90!black}{\texttt{#1}}}
+\newcommand{\smallnote}[1]{{\small\color{Ink!75}#1}}
+
+\title{Type inference in LAMBDA}
+\subtitle{Constraints, annotations, and explicit polymorphism}
+\author{CS413 / LAMBDA}
+\date{}
+
+\begin{document}
+
+\begin{frame}[plain]
+  \titlepage
+  \vspace{-5mm}
+  \begin{center}\smallnote{From typing constraints to the implementation in \texttt{lambda2.py}}\end{center}
+\end{frame}
+
+\begin{frame}[fragile]{Inference as constraint solving}
+\begin{columns}[T,onlytextwidth]
+\column{.54\textwidth}
+Start with unknown types for expressions whose types are not yet known.
+
+Each language construct adds equations between types. Substitution solves the
+equations. A conflict means the program is ill typed.
+
+\medskip
+The resolved type of the whole expression is the checker result.
+\column{.42\textwidth}
+\begin{lstlisting}
+lam (x) => x + 1
+
+parameter: ?t0
++ requires: ?t0 = int
+result: int
+function: int -> int
+\end{lstlisting}
+\end{columns}
+\medskip
+\smallnote{Omitted types are inferred. Inferred bindings are not generalized.}
+\end{frame}
+
+\begin{frame}[fragile]{Types and inference variables}
+\begin{columns}[T,onlytextwidth]
+\column{.53\textwidth}
+\[
+\begin{aligned}
+T ::=\;& \texttt{int} \mid \texttt{bool} \mid \texttt{unit}\\
+ &\mid (T_1,\ldots,T_n) \mid T_1\to T_2\\
+ &\mid \texttt{List}[T] \mid \texttt{Optn}[T] \mid ?t_N
+\end{aligned}
+\]
+A type may contain unknowns, for example
+\( ?t_0 \to \texttt{List}[?t_1] \).
+\column{.43\textwidth}
+\begin{itemize}
+\item \meta{solver.fresh()} creates an unknown \meta{?tN}.
+\item A substitution records what an unknown stands for.
+\item \meta{solver.apply(T)} follows substitutions through a type.
+\end{itemize}
+\end{columns}
+\medskip
+\begin{minipage}{\textwidth}\smallnote{Concrete types: \texttt{TInt}, \texttt{TBool}, \texttt{TTuple}, \texttt{TFun}, \texttt{TList}, \texttt{TOption}, and \texttt{TMeta}. Declared type variables are represented as \texttt{TPoly} before checking.}\end{minipage}
+\end{frame}
+
+\begin{frame}[fragile]{Unification turns uses into type facts}
+Two function types unify by matching their arguments and results. Tuple types
+unify component by component when their lengths match. Lists and options unify
+their element types. A metavariable can be replaced when that does not create
+an infinite type.
+
+\begin{columns}[T,onlytextwidth]
+\column{.45\textwidth}
+\begin{lstlisting}
+unify(?t0, int)
+  => ?t0 := int
+\end{lstlisting}
+\column{.52\textwidth}
+\begin{lstlisting}
+unify(?t1 -> bool, int -> ?t2)
+  ?t1 := int
+  ?t2 := bool
+\end{lstlisting}
+\end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{A complete inference example}
+\begin{center}\Large\ttfamily lam (x) => x + 1\end{center}
+\begin{enumerate}
+\item Give \texttt{x} a fresh type, \meta{?t0}.
+\item The \texttt{+} rule requires both operands to have type \texttt{int}, so \meta{?t0 = int}.
+\item The literal \texttt{1} has type \texttt{int}; the body therefore has type \texttt{int}.
+\item The lambda type \meta{?t0 -> int} resolves to \texttt{int -> int}.
+\end{enumerate}
+\end{frame}
+
+\begin{frame}[fragile]{The typing environment}
+\begin{columns}[T,onlytextwidth]
+\column{.55\textwidth}
+\meta{d0exp\_typecheck} checks each syntax tree node. Its environment maps
+names to type schemes.
+\begin{itemize}
+\item A monomorphic binding has no quantified variables.
+\item An explicitly polymorphic function quantifies only its declared type parameters.
+\item A lambda extends a copied environment with its parameter type.
+\end{itemize}
+\column{.41\textwidth}
+\begin{lstlisting}
+inner = dict(env)
+inner[param] =
+  monomorphic(parameter_type)
+\end{lstlisting}
+\end{columns}
+\medskip
+A recursive function binds both its function type and its parameter in the
+body. When a declaration gives a function signature, the checker uses it as
+context to infer omitted lambda and recursive parameter types.
+\end{frame}
+
+\begin{frame}[fragile]{Constraints by construct}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\textbf{Conditional}
+\begin{lstlisting}
+if c then a else b
+  unify(type(c), bool)
+  unify(type(a), type(b))
+\end{lstlisting}
+\textbf{Application}
+\begin{lstlisting}
+f(arg)
+  unify(type(f), type(arg) -> fresh())
+\end{lstlisting}
+\column{.48\textwidth}
+\textbf{Arithmetic}
+\begin{lstlisting}
+x + y
+  unify(type(x), int)
+  unify(type(y), int)
+\end{lstlisting}
+Container primitives constrain element types. The checker reports
+\meta{TypeCheckError} at a conflicting constraint.
+\end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{Explicit polymorphism, without generalization}
+\begin{lstlisting}
+identity[T] : T -> T = lam (x) => x
+\end{lstlisting}
+\begin{itemize}
+\item \texttt{T} is declared in the function name's type parameter list.
+\item The function needs an explicit signature. The lambda parameter type is inferred from it.
+\item Each use instantiates \texttt{T} with a fresh type.
+\end{itemize}
+\begin{lstlisting}
+identity(1)      # T is int at this use
+identity(true)   # T is bool at this use
+\end{lstlisting}
+The same syntax works for inner functions in local declaration blocks. Functions
+without explicit type parameters remain monomorphic. Inferred types are never
+generalized.
+\end{frame}
+
+\begin{frame}[fragile]{Annotations constrain inferred types}
+\begin{columns}[T,onlytextwidth]
+\column{.47\textwidth}
+\begin{lstlisting}
+(expression : T)
+\end{lstlisting}
+\begin{itemize}
+\item \texttt{D0Eanno} wraps an expression and its declared type.
+\item The checker infers the expression type, then unifies it with \texttt{T}.
+\item Declaration signatures also guide inference inside function bodies.
+\end{itemize}
+\column{.49\textwidth}
+\begin{lstlisting}
+(lam (x) => x + 1 : int -> int)
+# accepted
+
+(1 : bool)
+# rejected
+
+id[T] : T -> T = lam (x) => x
+# accepted
+\end{lstlisting}
+\end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{What the implementation checks}
+\begin{itemize}
+\item Applications, arithmetic, comparisons, conditionals, tuples, and projections.
+\item Homogeneous list and option operations, with element types inferred from use.
+\item Recursive function bodies against their result types.
+\item Expression and declaration annotations, including explicit polymorphic signatures.
+\item Unbound names, tuple index errors, mismatched types, and infinite types.
+\end{itemize}
+\begin{lstlisting}
+d0exp_parse_and_typecheck(source)
+  expression = d0exp_parse(source)
+  return expression, d0exp_typecheck(expression)
+
+d0cls_typecheck(d0cls_parse(source))
+\end{lstlisting}
+\end{frame}
+
+\end{document}

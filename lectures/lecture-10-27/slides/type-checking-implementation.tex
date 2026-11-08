@@ -1,0 +1,504 @@
+\documentclass[aspectratio=169,11pt]{beamer}
+\usetheme{Madrid}
+\usecolortheme{seahorse}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{listings}
+\lstset{basicstyle=\ttfamily\small, columns=fullflexible, keepspaces=true,
+  showstringspaces=false, frame=single, xleftmargin=2pt, xrightmargin=2pt}
+\newcommand{\Int}{\mathsf{int}}
+\newcommand{\Bool}{\mathsf{bool}}
+\newcommand{\ListT}[1]{\mathsf{List}[#1]}
+\newcommand{\OptionT}[1]{\mathsf{Optn}[#1]}
+\title[Typed LAMBDA]{Type-checking in LAMBDA}
+\subtitle{How the implementation represents and checks types}
+\author{CS 413}
+\date{October 20, 2026}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\begin{frame}{What this implementation checks}
+\begin{itemize}
+  \item Lambda and recursive-function parameters carry type annotations.
+  \item A let-bound name gets its type from its initializer; its annotation is optional.
+  \item The parser stores annotations and let initializers in the expression tree.
+  \item A recursive checker walks the tree and checks each operation.
+  \item A small unifier connects unknown element types for empty lists and options.
+\end{itemize}
+\begin{block}{The central question}
+Given the expression tree and the types of names in scope, can every part of this expression be used consistently?
+\end{block}
+\end{frame}
+
+\begin{frame}[fragile]{Types are written at binders}
+\begin{columns}[T]
+\column{.53\textwidth}
+\begin{lstlisting}
+let
+  inc =
+    lam (n : int) => n + 1
+  answer = inc(41)
+in
+  answer
+end
+\end{lstlisting}
+\column{.42\textwidth}
+The lambda annotation gives the parameter type. Each let-bound name gets the type of its initializer, so a let annotation is optional.
+\medskip
+
+Names are introduced explicitly; lambda and recursive-function parameters still carry annotations.
+\end{columns}
+\end{frame}
+
+\begin{frame}{The type vocabulary}
+\begin{columns}[T]
+\column{.47\textwidth}
+\[
+T ::= \Int \mid \Bool \mid T\to T \mid (T_1,\ldots,T_n)
+\]
+\[
+\phantom{T ::=}\mid \ListT{T} \mid \OptionT{T}
+\]
+\column{.49\textwidth}
+\begin{itemize}
+  \item Function: \texttt{int -> bool}
+  \item Tuple: \texttt{(int, bool)}
+  \item Empty tuple: \texttt{unit}
+  \item List and option: \texttt{List[int]}, \texttt{Optn[bool]}
+\end{itemize}
+\end{columns}
+\bigskip
+Lists and options are homogeneous: every element or wrapped value has the same type.
+\end{frame}
+
+\begin{frame}{Types have matching data structures}
+The checker represents types as Python objects:
+\begin{center}
+\begin{tabular}{ll}
+\textbf{Type object} & \textbf{Meaning} \\
+\hline
+\texttt{TInt()} & integer \\
+\texttt{TBool()} & boolean \\
+\texttt{TFun(argument, result)} & function type \\
+\texttt{TTuple(items)} & tuple with component types \\
+\texttt{TList(element)} & homogeneous list \\
+\texttt{TOption(element)} & option value \\
+\texttt{TMeta(id)} & temporary unknown type \\
+\end{tabular}
+\end{center}
+\medskip
+For example, \texttt{int -> List[bool]} is \texttt{TFun(TInt(), TList(TBool()))}.
+\end{frame}
+
+\begin{frame}{The AST keeps each annotation}
+The parser turns source into dataclass nodes. The checker reads their fields.
+\begin{columns}[T]
+\column{.49\textwidth}
+\begin{block}{Lambda}
+\texttt{D0Elam(arg1, arg2, ann)}
+\begin{itemize}
+  \item \texttt{arg1}: parameter name
+  \item \texttt{arg2}: body
+  \item \texttt{ann}: parameter type
+\end{itemize}
+\end{block}
+\column{.49\textwidth}
+\begin{block}{Recursive function}
+\texttt{D0Efix(arg1, arg2, arg3, ann, parameter\_type)}
+\begin{itemize}
+  \item function name and parameter name
+  \item body
+  \item declared function and parameter types
+\end{itemize}
+\end{block}
+\end{columns}
+Let declarations store their initializer and an optional declared type.
+\end{frame}
+
+\begin{frame}{Parsing annotations}
+The parser handles types with a small recursive-descent routine:
+\begin{enumerate}
+  \item Read a type atom: \texttt{int}, \texttt{bool}, a tuple, \texttt{List[T]}, or \texttt{Optn[T]}.
+  \item If an arrow follows, parse the result type recursively.
+  \item Build a \texttt{TFun} node. Recursion makes arrows associate right.
+\end{enumerate}
+\begin{exampleblock}{Right-associative arrows}
+\texttt{int -> bool -> int} means \texttt{int -> (bool -> int)}.
+\end{exampleblock}
+Malformed syntax is rejected before type-checking begins. Let declarations may omit their annotation; lambda and recursive-function parameters still require theirs.
+\end{frame}
+
+\begin{frame}{The environment is a type lookup table}
+\[
+\Gamma = \{\texttt{inc}:\Int\to\Int,\quad \texttt{xs}:\ListT{\Int}\}
+\]
+\begin{itemize}
+  \item Checking a variable looks up its name in $\Gamma$.
+  \item Checking a lambda adds its parameter and annotation for the body.
+  \item Checking a let initializer uses the current environment.
+  \item After the initializer checks, its type (or the declared type, if present) enters the environment for later declarations.
+\end{itemize}
+\begin{block}{Sequential scope}
+In \texttt{let x = 4 y = x + 1 in y end}, the first \texttt{x} is available in the initializer for \texttt{y}; its type is inferred as \texttt{int}.
+\end{block}
+\end{frame}
+
+\begin{frame}{The checker follows the expression tree}
+The nested \texttt{check(expr, env)} function handles one AST form at a time.
+\begin{columns}[T]
+\column{.49\textwidth}
+\textbf{Examples}
+\begin{itemize}
+  \item integer literal returns \texttt{TInt}
+  \item variable returns its environment type
+  \item addition checks two integers
+  \item comparison checks two integers and returns boolean
+\end{itemize}
+\column{.49\textwidth}
+\textbf{Conditional}
+\[
+\frac{c:\Bool\quad a:T\quad b:T}
+     {\mathsf{if}\ c\ \mathsf{then}\ a\ \mathsf{else}\ b:T}
+\]
+The implementation checks the condition, checks both branches, then unifies their types.
+\end{columns}
+\end{frame}
+
+\begin{frame}{Function application creates a type constraint}
+For an application \texttt{f(arg)}, the checker:
+\begin{enumerate}
+  \item checks the type of \texttt{f}
+  \item checks the type of \texttt{arg}
+  \item requires \texttt{f} to have type \texttt{argumentType -> resultType}
+\end{enumerate}
+\begin{exampleblock}{A valid call}
+If \texttt{inc : int -> int}, then \texttt{inc(41) : int}.
+\end{exampleblock}
+\begin{alertblock}{A rejected call}
+\texttt{inc(true)} creates the constraint \texttt{int = bool}, which cannot be solved.
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{Unification fills in unknown element types}
+\texttt{list\_nil()} has no element to inspect, so the checker gives it a fresh type variable, say $\alpha$.
+\[
+\texttt{list\_nil()} : \mathsf{List}[\alpha]
+\]
+In \texttt{list\_cons(4, list\_nil())}, the integer head constrains $\alpha$ to \texttt{int}. The result is \texttt{List[int]}.
+\begin{itemize}
+  \item \texttt{TMeta(id)} represents a fresh unknown.
+  \item Unification records substitutions from unknowns to known types.
+  \item An occurs check prevents circular types such as a type being a list of itself.
+\end{itemize}
+The same mechanism handles \texttt{optn\_nil()} and the result of \texttt{list\_head}.
+\end{frame}
+
+\begin{frame}{Why unification needs an occurs-check}
+When solving a constraint $\alpha = T$, it is not enough to ask whether $T$ is a type. We must also make sure $T$ does not contain $\alpha$.
+\begin{exampleblock}{A circular constraint}
+Suppose application constraints lead to $\alpha = \alpha\to\Int$. Substituting this back into itself gives
+\[
+\alpha = (\alpha\to\Int)\to\Int = (((\alpha\to\Int)\to\Int)\to\Int) = \cdots
+\]
+No finite type satisfies this equation.
+\end{exampleblock}
+The occurs-check rejects a binding if the unknown already appears inside the type assigned to it.
+\end{frame}
+
+\begin{frame}[fragile]{How the occurs-check works}
+To bind metavariable $\alpha$ to type $T$:
+\begin{enumerate}
+  \item First apply current substitutions to $T$.
+  \item Recursively search $T$'s structure for $\alpha$.
+  \item If found, report a type error; otherwise record $\alpha\mapsto T$.
+\end{enumerate}
+\begin{lstlisting}
+def bind(meta, typ):
+    typ = apply_substitution(typ)
+    if typ == meta:
+        return
+    if occurs(meta, typ):
+        raise TypeCheckError("infinite type")
+    substitution[meta] = typ
+\end{lstlisting}
+For a function type, \texttt{occurs} searches both argument and result types; for lists, options, and tuples, it searches their component types.
+\end{frame}
+
+\begin{frame}[fragile]{Checking recursion}
+\begin{lstlisting}
+fact : int -> int =
+  fix fact(n: int): int =>
+    if n <= 1 then 1 else n * fact(n - 1)
+\end{lstlisting}
+The checker verifies three things:
+\begin{enumerate}
+  \item The recursive name \texttt{fact} has the declared type \texttt{int -> int} inside its body.
+  \item The parameter \texttt{n} has type \texttt{int}.
+  \item The body has the declared result type \texttt{int}.
+\end{enumerate}
+A recursive call is checked like any other function application.
+\end{frame}
+
+\begin{frame}[fragile]{A worked example from the test programs}
+\begin{lstlisting}
+apply_twice : (int -> int, int) -> int =
+  lam (p : (int -> int, int)) => p.0(p.0(p.1))
+\end{lstlisting}
+The environment inside the body contains:
+\[
+\texttt{p}:(\Int\to\Int,\Int)
+\]
+So projection \texttt{p.0} has type \texttt{int -> int} and \texttt{p.1} has type \texttt{int}. Applying the function twice still returns \texttt{int}, which matches the annotation.
+\end{frame}
+
+\begin{frame}{Type errors point to the violated constraint}
+The examples in \texttt{LAMBDA/mytest/type\_error\_*.lam} isolate common failures:
+\begin{itemize}
+  \item \texttt{is\_small(true)}: expected integer argument, got boolean.
+  \item \texttt{if 1 then ...}: condition must be boolean.
+  \item \texttt{if true then 10 else false}: branch types disagree.
+  \item \texttt{list\_cons(true, list\_cons(1, ...))}: list elements disagree.
+  \item Recursive body returns boolean where its annotation promises integer.
+\end{itemize}
+The exception is \texttt{TypeCheckError}, a subtype of Python's \texttt{TypeError}.
+\end{frame}
+
+\begin{frame}[fragile]{Using the checker}
+\begin{lstlisting}
+from pathlib import Path
+from LAMBDA.lambda2 import d0cls_parse, d0cls_typecheck
+from LAMBDA.lambda2 import d0exp_parse_and_typecheck
+
+decls = d0cls_parse(Path('LAMBDA/mytest/examples.lam').read_text())
+d0cls_typecheck(decls)
+
+expr, typ = d0exp_parse_and_typecheck('1 + 2')
+\end{lstlisting}
+For a complete program, call the checker before the evaluator. The evaluator retains dynamic checks, but does not invoke the static checker automatically.
+\end{frame}
+
+\begin{frame}{Scope and limits}
+\begin{itemize}
+  \item The checker is monomorphic: each let-bound name has one type.
+  \item Let-bound names take the initializer's type; lambda and recursive-function parameters remain annotated.
+  \item Empty list and option types are solved from their uses.
+  \item \texttt{list\_head}, \texttt{optn\_get}, and division can still fail at runtime on empty values or a zero divisor.
+  \item Type-checking does not prove termination or program intent.
+\end{itemize}
+\begin{block}{Takeaway}
+The implementation turns type rules into a recursive AST walk, with unification where an element type is initially unknown.
+\end{block}
+\end{frame}
+
+\begin{frame}{Let types come from their initializers}
+\begin{alertblock}{Current behavior}
+Let declarations may omit a type annotation. The checker uses the initializer's
+type for the new name. If a let annotation is supplied, the initializer must
+match it. Lambda parameters and recursive-function parameters remain annotated.
+\end{alertblock}
+\medskip
+The existing metavariables infer selected unknowns, such as the element type
+of an empty list or option; let-bound names still receive the resolved type of
+their initializer.
+\end{frame}
+
+\begin{frame}{Possible extension: infer parameter types}
+The current parser requires annotations on lambda and recursive-function
+parameters. To infer those types, the parser could record omitted annotations
+as absent and the checker could supply fresh unknown types.
+\begin{center}
+\begin{tabular}{lll}
+\textbf{Binder} & \textbf{Unknown introduced} & \textbf{Use} \\
+\hline
+\texttt{lam (x) => e} & $x:\alpha$ & infer function type $\alpha\to\tau$ \\
+\texttt{fix f(x) => e} & $x:\alpha,\ f:\alpha\to\beta$ & check body against $\beta$ \\
+\end{tabular}
+\end{center}
+The AST can keep the same shape with optional parameter annotation fields. A
+missing annotation means ``create an unknown,'' not ``skip checking.''
+\end{frame}
+
+\begin{frame}[fragile]{Constraints arise from uses}
+For each expression, return a type that may contain unknowns; operations add
+equalities that the solver must satisfy.
+\begin{columns}[T]
+\column{.48\textwidth}
+\begin{lstlisting}
+lam (x) => x + 1
+\end{lstlisting}
+Initially $x:\alpha$. Addition requires $\alpha=\Int$, so the result is
+$\Int$ and the whole expression has type $\Int\to\Int$.
+\column{.48\textwidth}
+\begin{lstlisting}
+lam (f) => lam (x) => f(x)
+\end{lstlisting}
+Application requires $f:\alpha\to\beta$ and $x:\alpha$. The inferred type
+is $(\alpha\to\beta)\to\alpha\to\beta$.
+\end{columns}
+\medskip
+An unused parameter stays unknown: \texttt{lam (x) => 0} has type
+$\alpha\to\Int$ for any $\alpha$.
+\end{frame}
+
+\begin{frame}{One solver, two phases}
+\begin{enumerate}
+  \item \textbf{Generate constraints:} walk the AST, create fresh metavariables,
+  and unify types required by each construct.
+  \item \textbf{Solve and report:} apply substitutions to the expression's
+  type; report a mismatch where unification fails.
+\end{enumerate}
+For application $e_1(e_2)$, infer $e_1:\tau_1$ and $e_2:\tau_2$, choose fresh
+$\beta$, then unify $\tau_1$ with $\tau_2\to\beta$. The result type is $\beta$.
+\begin{block}{Implementation detail}
+Metavariables must be read through the current substitution before they are
+compared or printed. The occurs check still prevents infinite types.
+\end{block}
+\end{frame}
+
+\begin{frame}[fragile]{Let and recursion need special care}
+\begin{columns}[T]
+\column{.49\textwidth}
+\textbf{Monomorphic let}
+\begin{lstlisting}
+let id = lam (x) => x
+in (id(1), id(true)) end
+\end{lstlisting}
+With one shared type for \texttt{id}, the calls force its argument type to be
+both \texttt{int} and \texttt{bool}; this is rejected.
+\column{.49\textwidth}
+\textbf{Recursive binding}
+\begin{itemize}
+  \item Give \texttt{f} a provisional type $\alpha\to\beta$ before checking
+  its body.
+  \item Check recursive calls using that same provisional type.
+  \item Unify the body result with $\beta$; check any declared annotation too.
+\end{itemize}
+\end{columns}
+Polymorphic let requires an extra generalization step: quantify unknowns not
+fixed by the surrounding environment, then instantiate them freshly at each
+use. That is a further extension beyond monomorphic inference.
+\end{frame}
+
+\begin{frame}{What is a REST API?}
+An API is a contract that lets one program request services from another. A REST-style web API exposes resources at URLs and uses familiar HTTP operations to work with them.
+\begin{center}
+\begin{tabular}{ll}
+\textbf{HTTP method} & \textbf{Typical meaning} \\
+\hline
+\texttt{GET} & retrieve a resource \\
+\texttt{POST} & submit data or ask the server to perform an operation \\
+\texttt{PUT}/\texttt{PATCH} & replace or update a resource \\
+\texttt{DELETE} & remove a resource \\
+\end{tabular}
+\end{center}
+The URL identifies what the request is about; the method says what action is intended. Requests and responses commonly carry JSON data.
+\end{frame}
+
+\begin{frame}[fragile]{Resources and their representations}
+A \textbf{resource} is the thing an API lets a client refer to. A \textbf{representation} is data that describes the resource or carries its state in a particular format.
+\begin{columns}[T]
+\column{.47\textwidth}
+\textbf{Resource:} a LAMBDA program
+\begin{lstlisting}
+{"source": "1 + 2"}
+\end{lstlisting}
+This JSON is a representation that carries the program text to the service.
+\column{.47\textwidth}
+\textbf{Compile result:}
+\begin{lstlisting}
+{"ok": true,
+ "type": "int"}
+\end{lstlisting}
+This JSON represents the result of checking that program.
+\end{columns}
+The representation is not the resource itself; it is a transferable description of its state or result.
+\end{frame}
+
+\begin{frame}{REST: requests are self-contained}
+Each request carries the information the server needs to handle it, such as the URL, method, headers, and body. The server does not rely on hidden conversation state from an earlier request.
+\begin{itemize}
+  \item The client and server communicate through a uniform HTTP interface.
+  \item Responses include a status code and may include a JSON body.
+  \item A client can be a browser, command-line tool, or another service.
+\end{itemize}
+\begin{exampleblock}{One request, one answer}
+Send source code in a request body; receive a result and diagnostics in the response body.
+\end{exampleblock}
+REST is an architectural style, not a specific programming language, framework, or wire format.
+\end{frame}
+
+\begin{frame}{Map the compile service to HTTP}
+The compiler service has one main job: check a submitted LAMBDA program.
+\begin{center}
+\begin{tabular}{lll}
+\textbf{Part} & \textbf{Example} & \textbf{Role} \\
+\hline
+Method & \texttt{POST} & submit source for checking \\
+Path & \texttt{/api/compile} & name the compile operation \\
+JSON body & \texttt{"source": "1 + 2"} & carry the program text \\
+JSON response & \texttt{"ok": true, "type": "int"} & return result \\
+\end{tabular}
+\end{center}
+The client sends a request; the service parses and type-checks the source, then returns a response. No client session is needed for this basic operation.
+\end{frame}
+
+\begin{frame}{From compiler library to web service}
+The parser and checker can sit behind a small HTTP API:
+\begin{center}
+\begin{tabular}{c c c c c}
+Browser or client & $\longrightarrow$ & HTTP service & $\longrightarrow$ & LAMBDA front end \\
+\end{tabular}
+\end{center}
+\begin{itemize}
+  \item Client submits LAMBDA source as text.
+  \item Service parses and type-checks it, then returns structured JSON.
+  \item Keep the compiler functions independent of HTTP; the route is a thin adapter.
+\end{itemize}
+\begin{block}{First endpoint}
+\texttt{POST /api/compile} accepts one program and reports whether it is well-typed, along with its type or diagnostics.
+\end{block}
+\end{frame}
+
+\begin{frame}[fragile]{Define a request and response}
+\begin{columns}[T]
+\column{.48\textwidth}
+\textbf{Request:} \texttt{POST /api/compile}
+\begin{lstlisting}
+Content-Type: application/json
+
+{"source": "1 + 2"}
+\end{lstlisting}
+\column{.48\textwidth}
+\textbf{Successful response:} \texttt{200}
+\begin{lstlisting}
+{
+  "ok": true,
+  "type": "int"
+}
+\end{lstlisting}
+\end{columns}
+\medskip
+For invalid programs, return \texttt{ok: false} and a diagnostic. Use \texttt{400} for malformed JSON or missing fields; reserve \texttt{500} for unexpected server failures. Keep response fields stable so clients can handle errors reliably.
+\end{frame}
+
+\begin{frame}[fragile]{The route is a narrow adapter}
+\begin{lstlisting}
+def compile_route(request):
+    source = require_string(request.json, "source")
+    try:
+        decls = d0cls_parse(source)
+        typ = d0cls_typecheck(decls)
+        return {"ok": True, "type": format_type(typ)}, 200
+    except (ParseError, TypeCheckError) as err:
+        return {"ok": False, "error": str(err)}, 200
+\end{lstlisting}
+The exact parser return shape and checker API determine the glue code. Validate input size, avoid exposing stack traces, and do not evaluate submitted programs unless execution is an explicit feature with its own limits.
+\end{frame}
+
+\end{document}

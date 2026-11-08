@@ -1,0 +1,41 @@
+# Backtracking search for one solution to the 8-queens puzzle.
+# The list stores one row per already-filled column, newest column first.
+let
+  safe : (sint, sint, List[sint]) -> bool =
+    fix safe(state: (sint, sint, List[sint])): bool =>
+      let
+        row = state.0;
+        distance = state.1;
+        queens = state.2
+      in
+        if list_nilq(queens) then true
+        else
+          let previous = list_head(queens)
+          in
+            if previous == row then false
+            else if previous == row - distance then false
+            else if previous == row + distance then false
+            else safe(row, distance + 1, list_tail(queens))
+          end
+      end;
+  search : (sint, sint, List[sint]) -> Optn[List[sint]] =
+    fix search(state: (sint, sint, List[sint])): Optn[List[sint]] =>
+      let
+        column = state.0;
+        row = state.1;
+        queens = state.2
+      in
+        if column == 8 then optn_cons(queens)
+        else if row >= 8 then optn_nil()
+        else if safe(row, 1, queens) then
+          let attempt = search(column + 1, 0, list_cons(row, queens))
+          in
+            if optn_nilq(attempt) then search(column, row + 1, queens)
+            else attempt
+          end
+        else search(column, row + 1, queens)
+      end;
+  empty : List[sint] = list_nil()
+in
+  search(0, 0, empty)
+end

@@ -1,0 +1,325 @@
+\documentclass[aspectratio=169,10pt]{beamer}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{listings}
+\usepackage{xcolor}
+
+\definecolor{Ink}{HTML}{172B3A}
+\definecolor{Blue}{HTML}{235789}
+\definecolor{Muted}{HTML}{526574}
+\definecolor{Paper}{HTML}{F5F7F8}
+\definecolor{Code}{HTML}{EAF0F4}
+\setbeamercolor{normal text}{fg=Ink,bg=white}
+\setbeamercolor{frametitle}{fg=Ink,bg=white}
+\setbeamercolor{title}{fg=Ink}
+\setbeamercolor{structure}{fg=Blue}
+\setbeamercolor{block title}{fg=Blue,bg=white}
+\setbeamercolor{block body}{fg=Ink,bg=Paper}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+\setbeamersize{text margin left=0.7cm,text margin right=0.7cm}
+\setlength{\parskip}{0.35em}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false,
+  breaklines=true,
+  backgroundcolor=\color{Code},
+  frame=single,
+  rulecolor=\color{Code},
+  xleftmargin=0.4em,
+  xrightmargin=0.4em,
+  aboveskip=0.6em,
+  belowskip=0.6em
+}
+
+\title{Turning LAMBDA into Python}
+\subtitle{A register-based compiler, using recursive factorial}
+\author{CS413}
+\date{Fall 2026}
+
+\begin{document}
+
+\begin{frame}[plain]
+  \titlepage
+\end{frame}
+
+\begin{frame}{Compiler pipeline}
+  \begin{enumerate}
+    \item \textbf{Parse source.} \texttt{d0exp\_parse} turns LAMBDA text into expression nodes.
+    \item \textbf{Check types.} The type checker can reject invalid expressions before compilation.
+    \item \textbf{Compile the AST.} \texttt{d0exp\_compile} lowers each node to registers and Python statements.
+    \item \textbf{Run Python.} The generated module defines \texttt{\_lambda\_main} and stores its result in \texttt{\_lambda\_result}.
+  \end{enumerate}
+  \vspace{0.6em}
+  \begin{block}{Important interface detail}
+    The compiler accepts an AST, not source text. A typical caller parses first, then passes the AST to \texttt{d0exp\_compile}.
+  \end{block}
+\end{frame}
+
+\begin{frame}[fragile]{Input program: factorial}
+  \begin{lstlisting}[language=Python]
+let
+  fact : int -> int =
+    fix fact(n: int): int =>
+      if n <= 1 then 1 else n * fact(n - 1)
+in
+  (fact(0), fact(1), fact(5), fact(6))
+end
+  \end{lstlisting}
+  \vspace{0.3em}
+  \begin{itemize}
+    \item \texttt{fix} binds both the recursive function name and its parameter.
+    \item The condition selects one branch; the other branch must not run.
+    \item The final tuple makes several results visible in one evaluation.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{The parser produces an AST}
+  The outer expression is a sequential binding followed by a tuple result:
+  \begin{lstlisting}
+D0Elet(some name elided)
+  value: D0Efix(fact, n, body)
+    body: D0Eif0
+      test: D0Eop2("<=", D0Evar(n), D0Eint(1))
+      then: D0Eint(1)
+      else: D0Eop2("*", D0Evar(n), recursive_call)
+  body: D0Etupl(fact(0), fact(1), fact(5), fact(6))
+  \end{lstlisting}
+  \vspace{0.3em}
+  \texttt{D0Eint}, \texttt{D0Efix}, and \texttt{D0Eif0} are dataclass variants. Types are annotations on AST nodes and are erased by code generation.
+\end{frame}
+
+\begin{frame}[fragile]{AST classes describe LAMBDA syntax}
+  Expression variants inherit from \texttt{D0E000}; declarations inherit from
+  \texttt{D0C000}. Their dataclass fields hold child nodes and source names.
+  \begin{columns}[T]
+    \column{.48\textwidth}
+    \begin{lstlisting}
+D0Eint(value)
+D0Evar(name)
+D0Eop1(operator, operand)
+D0Eop2(operator, left, right)
+D0Eapp(function, argument)
+D0Eif0(test, then, otherwise)
+    \end{lstlisting}
+    \column{.48\textwidth}
+    \begin{lstlisting}
+D0Elam(parameter, body, annotation)
+D0Efix(name, parameter, body, ...)
+D0Elet(name, value, body)
+D0Elets(declarations, body)
+D0Etupl(items)
+D0Eproj(tuple, zero_based_index)
+    \end{lstlisting}
+  \end{columns}
+  \smallskip
+  \texttt{D0Cval} represents a named declaration, including its optional type
+  annotation and explicit type parameters. The aliases \texttt{d0exp} and
+  \texttt{d0cls} name the expression and declaration base types.
+\end{frame}
+
+\begin{frame}[fragile]{Type classes represent checker data}
+  \begin{columns}[T]
+    \column{.48\textwidth}
+    \begin{lstlisting}
+TInt()        TBool()
+TTuple(items)
+TFun(argument, result)
+TList(element) TOption(element)
+TMeta(ident)  TPoly(name)
+    \end{lstlisting}
+    The variants form the \texttt{simple\_type} union. The type dataclasses
+    are frozen, so a type node is immutable after construction.
+    \column{.48\textwidth}
+    \begin{lstlisting}
+_Scheme(
+  quantified={...},
+  typ=TFun(TMeta(0), TMeta(0)))
+    \end{lstlisting}
+    \texttt{TMeta} holds an inference variable. \texttt{TPoly} marks a declared
+    type parameter. \texttt{\_Scheme} pairs a type with the inference
+    variables quantified by a polymorphic declaration.
+  \end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{Runtime values and environments}
+  The interpreter has its own class hierarchy; evaluating an AST produces
+  \texttt{D0V} values rather than Python primitives.
+  \begin{columns}[T]
+    \column{.48\textwidth}
+    \begin{lstlisting}
+D0Vint(number)   D0Vbtf(flag)
+D0Vlist(items)  D0Voptn(option)
+D0Vtupl(items)
+D0Vlam(environment, lambda_ast)
+D0Vfix(environment, fix_ast)
+    \end{lstlisting}
+    A function value keeps the syntax it will run and the environment needed
+    for its free variables. This pair is a closure.
+    \column{.48\textwidth}
+    \begin{lstlisting}
+ENVnil()
+ENVcns(name, value, rest)
+    \end{lstlisting}
+    Environments are linked bindings. Lookup checks the newest binding first,
+    so an inner binding naturally shadows an outer one. The type \texttt{d0val}
+    aliases the runtime value base class.
+  \end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{Classes supporting parsing and compilation}
+  \begin{itemize}
+    \item \texttt{\_Token} stores a token's kind, text, and source offset;
+      \texttt{\_Parser} consumes tokens and builds the AST.
+    \item \texttt{LambdaSyntaxError} reports malformed source with line and
+      column; \texttt{TypeCheckError} reports static type failures.
+    \item \texttt{\_TypeSolver} creates \texttt{TMeta} variables and records
+      substitutions while unifying types.
+    \item \texttt{\_PyCompiler} walks the expression AST;
+      \texttt{\_PyComp} carries the generated result name and instruction list.
+    \item Instructions are dataclass variants: \texttt{\_PyAssign},
+      \texttt{\_PyDef}, and \texttt{\_PyIf}.
+  \end{itemize}
+  These helper classes support separate stages. The expression and type nodes
+  are the shared data passed between parsing, checking, interpreting, and
+  Python emission.
+\end{frame}
+
+\begin{frame}[fragile]{Compilation uses result registers}
+  Each recursive compiler call returns a result name and ordered instruction
+  objects. The emitter turns these objects into Python statements:
+  \begin{lstlisting}
+_PyComp(result="_v6", instructions=[
+    _PyAssign(target="_v4", value="1"),
+    _PyAssign(target="_v5", value="(_a1 - _v4)"),
+    _PyAssign(target="_v6", value="_v1(_v5)"),
+])
+  \end{lstlisting}
+  \begin{itemize}
+    \item \texttt{reg\_new()} creates names such as \texttt{\_v1}, \texttt{\_v2}.
+    \item The compile environment maps LAMBDA names to Python names, for example \texttt{n -> \_a1}.
+    \item \texttt{\_PyDef} and \texttt{\_PyIf} contain nested instruction lists, so function and branch bodies stay structured.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Instruction objects and Python emission}
+  Assignment instructions store a target and expression. Control-flow
+  instructions store child blocks and their result registers:
+  \begin{lstlisting}
+_PyIf(test="_v3", result="_v9",
+  then_body=[_PyAssign("_v4", "1")], then_result="_v4",
+  else_body=[_PyAssign("_v5", "2")], else_result="_v5")
+  \end{lstlisting}
+  \begin{itemize}
+    \item The recursive emitter prints each instruction at the requested indentation.
+    \item \texttt{d0exp\_compile(ast)} returns the complete generated program.
+    \item \texttt{d0exp\_emit(ast)} prints that program to standard output.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Scope and evaluation order}
+  The compiler environment maps each LAMBDA name to a generated Python local.
+  Extending a scope copies that map, so shadowing affects only the body.
+  \begin{columns}[T]
+    \column{.48\textwidth}
+    \textbf{A let aliases its value register}
+    \begin{lstlisting}
+value = compile(rhs, env)
+body_env = dict(env)
+body_env["x"] = value.result
+body = compile(body, body_env)
+    \end{lstlisting}
+    No extra Python assignment is needed. Sequential declarations extend the
+    environment after each initializer.
+    \column{.48\textwidth}
+    \textbf{Instructions preserve call-by-value order}
+    \begin{lstlisting}
+function instructions
+argument instructions
+result = function(argument)
+    \end{lstlisting}
+    Binary operators likewise emit left operand code, then right operand code,
+    followed by the operation.
+  \end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{Recursive functions become Python functions}
+  A LAMBDA \texttt{fix fact(n) => body} becomes a Python \texttt{def}. The compiler maps the recursive name to the function's own generated name.
+  \begin{lstlisting}
+def _v1(_a1):
+    _v2 = 1
+    _v3 = (_a1 <= _v2)
+    if _v3:
+        _v4 = 1
+        _v9 = _v4
+    else:
+        _v5 = 1
+        _v6 = (_a1 - _v5)
+        _v7 = _v1(_v6)       # recursive call
+        _v8 = (_a1 * _v7)
+        _v9 = _v8
+    return _v9
+  \end{lstlisting}
+  The nested \texttt{def} also closes over its surrounding registers.
+\end{frame}
+
+\begin{frame}[fragile]{Conditionals preserve LAMBDA evaluation}
+  The compiler emits branch bodies inside Python's \texttt{if}/\texttt{else}. Both branches are compiled, but only the selected branch executes.
+  \begin{lstlisting}
+if _v3:
+    _v4 = 1
+    _v9 = _v4
+else:
+    _v5 = 1
+    _v6 = (_a1 - _v5)
+    _v7 = _v1(_v6)
+    _v8 = (_a1 * _v7)
+    _v9 = _v8
+  \end{lstlisting}
+  \texttt{\_v9} is the merge register: each branch assigns it, and the surrounding code uses it as the conditional's result.
+\end{frame}
+
+\begin{frame}[fragile]{Generated module and running the example}
+  The compiler wraps the instruction list in a zero-argument entry point, adds runtime helpers for LAMBDA lists, options, and printing, then invokes the entry point.
+  \begin{lstlisting}
+def _lambda_main():
+    # generated instructions
+    return _v18
+
+_lambda_result = _lambda_main()
+  \end{lstlisting}
+  From \texttt{LAMBDA2/mytest}:
+  \begin{lstlisting}[language=Python]
+make check           # type-check and compare with the interpreter
+make show-factorial  # print the generated Python source
+  \end{lstlisting}
+  The factorial example returns \texttt{(1, 1, 120, 720)}.
+\end{frame}
+
+\begin{frame}[fragile]{Runtime values and helper calls}
+  Generated code uses Python's built-in values where they fit the LAMBDA data
+  model, and helper functions for operations that need checks or special
+  representations.
+  \begin{columns}[T]
+    \column{.48\textwidth}
+    \begin{itemize}
+      \item Integers and booleans use Python \texttt{int} and \texttt{bool}.
+      \item Lists and tuples use Python lists and tuples.
+      \item \texttt{list\_head}, \texttt{list\_tail}, and \texttt{list\_cons}
+        call runtime helpers that check their inputs.
+    \end{itemize}
+    \column{.48\textwidth}
+    \begin{itemize}
+      \item \texttt{optn\_nil} is \texttt{None}; \texttt{optn\_cons(x)} is a
+        tagged pair, so an option containing \texttt{None} stays distinct.
+      \item Source \texttt{/} emits Python \texttt{//} for integer division.
+      \item \texttt{print} formats the value, prints it, and returns unit
+        (\texttt{()}).
+    \end{itemize}
+  \end{columns}
+\end{frame}
+
+\end{document}

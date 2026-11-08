@@ -1,0 +1,93 @@
+# Sized array library: load with d0cls_parse, then evaluate using D0Elets.
+# Multiple arguments are passed as one tuple: a1sz_append(xs, ys).
+# Callback arguments follow the list library convention, for example
+# a1sz_foldleft(xs, initial, f) calls f(acc, x).
+# Primitives: a1sz_size, a1sz_getat, a1sz_setat, a1sz_make_ncpy,
+#             a1sz_make_nfun.
+
+a1sz_singleton[T] : T -> A1sz[T] = lam (x) => a1sz_make_ncpy(1, x)
+
+# a1sz_print(xs): print [value, ...] followed by a newline; return unit.
+a1sz_print[T] : A1sz[T] -> unit = lam (xs) => print(xs)
+
+a1sz_length[T] : A1sz[T] -> sint = lam (xs) => a1sz_size(xs)
+
+# Convert a linked list to a sized array, preserving element order.
+a1sz_make_list[T] : List[T] -> A1sz[T] = lam (xs) =>
+  let
+    length : List[T] -> sint = fix length(ys) =>
+      if list_nilq(ys) then 0 else 1 + length(list_tail(ys));
+    get : (List[T], sint) -> T = fix get(p) =>
+      if p.1 == 0 then list_head(p.0) else get(list_tail(p.0), p.1 - 1)
+  in
+    a1sz_make_nfun(length(xs), lam (i) => get(xs, i))
+  end
+
+a1sz_reverse[T] : A1sz[T] -> A1sz[T] = lam (xs) =>
+  a1sz_make_nfun(a1sz_size(xs), lam (i) =>
+    a1sz_getat(xs, a1sz_size(xs) - 1 - i))
+
+a1sz_append[T] : (A1sz[T], A1sz[T]) -> A1sz[T] = lam (p) =>
+  a1sz_make_nfun(a1sz_size(p.0) + a1sz_size(p.1), lam (i) =>
+    if i < a1sz_size(p.0) then a1sz_getat(p.0, i)
+    else a1sz_getat(p.1, i - a1sz_size(p.0)))
+
+a1sz_concat[T] : A1sz[A1sz[T]] -> A1sz[T] = lam (xss) =>
+  let
+    total : sint -> sint = fix total(i) =>
+      if i >= a1sz_size(xss) then 0
+      else a1sz_size(a1sz_getat(xss, i)) + total(i + 1);
+    select : (sint, sint) -> T = fix select(p) =>
+      if p.1 < a1sz_size(a1sz_getat(xss, p.0))
+           then a1sz_getat(a1sz_getat(xss, p.0), p.1)
+      else if p.0 + 1 < a1sz_size(xss)
+           then select(p.0 + 1, p.1 - a1sz_size(a1sz_getat(xss, p.0)))
+           else a1sz_getat(a1sz_getat(xss, p.0), p.1)
+  in
+    a1sz_make_nfun(total(0), lam (i) => select(0, i))
+  end
+
+a1sz_map[T, U] : (A1sz[T], T -> U) -> A1sz[U] = lam (p) =>
+  a1sz_make_nfun(a1sz_size(p.0), lam (i) => p.1(a1sz_getat(p.0, i)))
+
+# Filter an array into a list, preserving order and calling the predicate once
+# per element.
+a1sz_filter_list[T] : (A1sz[T], T -> bool) -> List[T] = lam (p) =>
+  let
+    loop : sint -> List[T] = fix loop(i) =>
+      if i >= a1sz_size(p.0) then list_nil()
+      else if p.1(a1sz_getat(p.0, i))
+           then list_cons(a1sz_getat(p.0, i), loop(i + 1))
+           else loop(i + 1)
+  in
+    loop(0)
+  end
+
+a1sz_foldleft[T, A] : (A1sz[T], A, (A, T) -> A) -> A = lam (p) =>
+  let
+    loop : (sint, A) -> A = fix loop(q) =>
+      if q.0 >= a1sz_size(p.0) then q.1
+      else loop(q.0 + 1, p.2(q.1, a1sz_getat(p.0, q.0)))
+  in loop(0, p.1) end
+
+a1sz_foldright[T, A] : (A1sz[T], A, (T, A) -> A) -> A = lam (p) =>
+  let
+    loop : (sint, A) -> A = fix loop(q) =>
+      if q.0 < 0 then q.1
+      else loop(q.0 - 1, p.2(a1sz_getat(p.0, q.0), q.1))
+  in loop(a1sz_size(p.0) - 1, p.1) end
+
+a1sz_exists[T] : (A1sz[T], T -> bool) -> bool = lam (p) =>
+  let
+    loop : sint -> bool = fix loop(i) =>
+      if i >= a1sz_size(p.0) then false
+      else if p.1(a1sz_getat(p.0, i)) then true else loop(i + 1)
+  in loop(0) end
+
+a1sz_forall[T] : (A1sz[T], T -> bool) -> bool = lam (p) =>
+  let
+    loop : sint -> bool = fix loop(i) =>
+      if i >= a1sz_size(p.0) then true
+      else if p.1(a1sz_getat(p.0, i)) then loop(i + 1) else false
+  in loop(0) end
+

@@ -1,0 +1,11 @@
+# Lazies delay their thunk; stream tails have type Strm[T] = Lazy[Stcn[T]].
+let
+  deferred : Lazy[sint] = lazy_make(lam (u: unit) => 42);
+  tail : Strm[sint] = lazy_make(lam (u: unit) =>
+    stcn_cons(2, lazy_make(lam (v: unit) => stcn_nil())));
+  stream : Stcn[sint] = stcn_cons(1, tail)
+in
+  (lazy_eval(deferred), lazy_eval(deferred), stcn_consq(stream), stcn_head(stream),
+   stcn_head(lazy_eval(stcn_tail(stream))),
+   stcn_nilq(lazy_eval(stcn_tail(lazy_eval(stcn_tail(stream))))))
+end
