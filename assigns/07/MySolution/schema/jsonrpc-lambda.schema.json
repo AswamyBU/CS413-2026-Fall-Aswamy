@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cs413.example/assign07/jsonrpc-lambda.schema.json",
+  "title": "LAMBDA3 JSON-RPC 2.0 service (POST /rpc)",
+  "description": "Request and response bodies for POST /rpc. A body is one request or a nonempty batch; the response is one response object, an array of response objects, or no body (HTTP 204).",
+  "$defs": {
+    "id": {
+      "description": "Request id. Omitted in notifications. Responses to invalid requests use null.",
+      "type": ["string", "number", "null"]
+    },
+    "requestBody": {
+      "oneOf": [
+        { "$ref": "#/$defs/request" },
+        { "type": "array", "minItems": 1, "maxItems": 50, "items": { "$ref": "#/$defs/request" } }
+      ]
+    },
+    "request": {
+      "type": "object",
+      "required": ["jsonrpc", "method", "params"],
+      "additionalProperties": false,
+      "properties": {
+        "jsonrpc": { "const": "2.0" },
+        "method": { "type": "string" },
+        "params": { "type": "object" },
+        "id": { "$ref": "#/$defs/id" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "method": { "const": "service.health" } } },
+          "then": { "properties": { "params": { "$ref": "#/$defs/healthParams" } } }
+        },
+        {
+          "if": { "properties": { "method": { "enum": ["lambda.typecheck", "lambda.interpret"] } } },
+          "then": { "properties": { "params": { "$ref": "#/$defs/sourceParams" } } }
+        },
+        {
+          "if": { "properties": { "method": { "const": "lambda.compile" } } },
+          "then": { "properties": { "params": { "$ref": "#/$defs/compileParams" } } }
+        }
+      ]
+    },
+    "healthParams": { "type": "object", "maxProperties": 0 },
+    "source": {
+      "description": "LAMBDA3 source text: nonblank, at most 65536 UTF-8 bytes.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "libraries": {
+      "description": "Optional mylib/ libraries to bind around the source.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "enum": ["list", "optn", "a1sz", "strm"] }
+    },
+    "sourceParams": {
+      "type": "object",
+      "required": ["source"],
+      "additionalProperties": false,
+      "properties": {
+        "source": { "$ref": "#/$defs/source" },
+        "libraries": { "$ref": "#/$defs/libraries" }
+      }
+    },
+    "compileParams": {
+      "type": "object",
+      "required": ["source", "target"],
+      "additionalProperties": false,
+      "properties": {
+        "source": { "$ref": "#/$defs/source" },
+        "libraries": { "$ref": "#/$defs/libraries" },
+        "target": { "enum": ["python", "javascript"] }
+      }
+    },
+    "healthResult": {
+      "type": "object",
+      "required": ["status", "version"],
+      "additionalProperties": false,
+      "properties": { "status": { "const": "ok" }, "version": { "const": "1.0" } }
+    },
+    "typecheckResult": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": { "type": { "type": "string" } }
+    },
+    "interpretResult": {
+      "type": "object",
+      "required": ["type", "value"],
+      "additionalProperties": false,
+      "properties": { "type": { "type": "string" }, "value": { "type": "string" } }
+    },
+    "compileResult": {
+      "type": "object",
+      "required": ["target", "code"],
+      "additionalProperties": false,
+      "properties": {
+        "target": { "enum": ["python", "javascript"] },
+        "code": { "type": "string", "minLength": 1 }
+      }
+    },
+    "errorObject": {
+      "type": "object",
+      "required": ["code", "message"],
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "integer",
+          "enum": [-32700, -32600, -32601, -32602, -32603, -32010, -32011, -32012, -32013, -32014]
+        },
+        "message": { "type": "string" },
+        "data": { "type": "object" }
+      }
+    },
+    "successResponse": {
+      "type": "object",
+      "required": ["jsonrpc", "result", "id"],
+      "additionalProperties": false,
+      "properties": {
+        "jsonrpc": { "const": "2.0" },
+        "result": {
+          "oneOf": [
+            { "$ref": "#/$defs/healthResult" },
+            { "$ref": "#/$defs/typecheckResult" },
+            { "$ref": "#/$defs/interpretResult" },
+            { "$ref": "#/$defs/compileResult" }
+          ]
+        },
+        "id": { "$ref": "#/$defs/id" }
+      }
+    },
+    "errorResponse": {
+      "type": "object",
+      "required": ["jsonrpc", "error", "id"],
+      "additionalProperties": false,
+      "properties": {
+        "jsonrpc": { "const": "2.0" },
+        "error": { "$ref": "#/$defs/errorObject" },
+        "id": { "$ref": "#/$defs/id" }
+      }
+    },
+    "response": {
+      "oneOf": [{ "$ref": "#/$defs/successResponse" }, { "$ref": "#/$defs/errorResponse" }]
+    },
+    "responseBody": {
+      "description": "HTTP 200 body. (HTTP 204 has no body.)",
+      "oneOf": [
+        { "$ref": "#/$defs/response" },
+        { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/response" } }
+      ]
+    }
+  }
+}
