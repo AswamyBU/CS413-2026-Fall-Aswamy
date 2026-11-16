@@ -1,0 +1,300 @@
+\documentclass[aspectratio=169,10pt]{beamer}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{listings}
+\usepackage{xcolor}
+
+\definecolor{Ink}{HTML}{172B3A}
+\definecolor{Blue}{HTML}{235789}
+\definecolor{Muted}{HTML}{526574}
+\definecolor{Paper}{HTML}{F5F7F8}
+\definecolor{Code}{HTML}{EAF0F4}
+\setbeamercolor{normal text}{fg=Ink,bg=white}
+\setbeamercolor{frametitle}{fg=Ink,bg=white}
+\setbeamercolor{title}{fg=Ink}
+\setbeamercolor{structure}{fg=Blue}
+\setbeamercolor{block title}{fg=Blue,bg=white}
+\setbeamercolor{block body}{fg=Ink,bg=Paper}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+\setbeamersize{text margin left=0.7cm,text margin right=0.7cm}
+\setlength{\parskip}{0.35em}
+\lstset{basicstyle=\ttfamily\small,columns=fullflexible,keepspaces=true,
+  showstringspaces=false,breaklines=true,backgroundcolor=\color{Code},
+  frame=single,rulecolor=\color{Code},xleftmargin=0.4em,xrightmargin=0.4em,
+  aboveskip=0.6em,belowskip=0.6em}
+
+\title{Continuation-Passing Style}
+\subtitle{Making the rest of the computation explicit}
+\author{CS413}
+\date{Fall 2026}
+
+\begin{document}
+\begin{frame}[plain]\titlepage\end{frame}
+
+% 2 minutes
+\begin{frame}{A computation has a result and a next step}
+  Consider evaluating \texttt{(2 + 3) * 4}. After computing \texttt{2 + 3},
+  the program still has work to do: multiply that result by 4.
+  \begin{center}
+    \Large \texttt{2 + 3} \quad then \quad \texttt{multiply by 4}
+  \end{center}
+  \begin{block}{Continuation}
+    A continuation is a function that says what to do with a value when that
+    value becomes available.
+  \end{block}
+  Here the continuation for the sum is \texttt{fun x -> x * 4}. The final
+  answer is obtained by giving it the value \texttt{5}.
+\end{frame}
+
+% 2 minutes
+\begin{frame}[fragile]{Direct style hides the next step}
+  \begin{lstlisting}
+fun squarePlusOne(n) = n * n + 1
+  \end{lstlisting}
+  A direct-style function returns its answer to its caller. The caller's
+  remaining work sits outside the function.
+  \begin{center}
+    \texttt{squarePlusOne(3)} \quad returns \quad \texttt{10}
+  \end{center}
+  \vspace{0.5em}
+  CPS changes the interface: instead of returning a result, a function
+  receives a continuation and passes its result to that continuation.
+\end{frame}
+
+% 3 minutes
+\begin{frame}[fragile]{A function in CPS receives its continuation}
+  \begin{columns}[T]
+    \column{.48\textwidth}
+    \textbf{Direct style}
+    \begin{lstlisting}
+squarePlusOne(n) = n*n + 1
+    \end{lstlisting}
+    Result type: \texttt{int}
+    \column{.48\textwidth}
+    \textbf{Continuation-passing style}
+    \begin{lstlisting}
+squarePlusOne_cps(n, k) =
+  k(n*n + 1)
+    \end{lstlisting}
+    Result type: \texttt{(int -> R) -> R}
+  \end{columns}
+  \begin{block}{The identity continuation}
+    \texttt{fun x -> x} asks for the final value unchanged. Passing it in
+    recovers the ordinary result: \texttt{squarePlusOne\_cps(3, id) = 10}.
+  \end{block}
+  The type variable \texttt{R} describes the eventual answer produced by the
+  continuation; it need not be an integer.
+\end{frame}
+
+% 3 minutes
+\begin{frame}[fragile]{Translate an expression by naming its next step}
+  To translate \texttt{e} in a context that expects its value, write
+  \texttt{CPS(e, k)}.
+  \begin{lstlisting}
+CPS(42, k) = k(42)
+CPS(x,  k) = k(x)
+  \end{lstlisting}
+  For an addition, evaluate the left operand, then the right, then continue:
+  \begin{lstlisting}
+CPS(e1 + e2, k) =
+  CPS(e1, fun v1 ->
+    CPS(e2, fun v2 ->
+      k(v1 + v2)))
+  \end{lstlisting}
+  The nested functions remember the unfinished work. This translation makes
+  left-to-right evaluation order explicit.
+\end{frame}
+
+% 3 minutes
+\begin{frame}[fragile]{Example: CPS for a nested arithmetic expression}
+  Translate \texttt{(a + b) * c}:
+  \begin{lstlisting}
+CPS(a + b, fun sum ->
+  CPS(c, fun factor ->
+    k(sum * factor)))
+  \end{lstlisting}
+  \begin{enumerate}
+    \item Evaluate \texttt{a + b}; call the continuation with \texttt{sum}.
+    \item Evaluate \texttt{c}; call the next continuation with \texttt{factor}.
+    \item Multiply and hand the answer to \texttt{k}.
+  \end{enumerate}
+  With \texttt{a=2}, \texttt{b=3}, \texttt{c=4}, and identity \texttt{k},
+  the result is \texttt{20}.
+\end{frame}
+
+% 4 minutes
+\begin{frame}[fragile]{Recursive calls must also pass the rest of the work}
+  In factorial, after the recursive call returns, we still multiply by \texttt{n}.
+  CPS stores that multiplication in a continuation:
+  \begin{lstlisting}
+fact_cps(n, k) =
+  if n <= 1 then k(1)
+  else fact_cps(n - 1,
+    fun r -> k(n * r))
+  \end{lstlisting}
+  \begin{itemize}
+    \item Base case: the answer is 1, so pass 1 to \texttt{k}.
+    \item Recursive case: when \texttt{fact(n-1)} produces \texttt{r}, multiply by \texttt{n}, then continue.
+    \item Start with \texttt{fact\_cps(4, fun x -> x)}; the result is 24.
+  \end{itemize}
+\end{frame}
+
+% 3 minutes
+\begin{frame}{The continuation records pending multiplications}
+  For \texttt{fact\_cps(4, id)}, the recursive descent builds this chain:
+  \begin{center}
+    \texttt{id} $\leftarrow$ \texttt{fun r -> id(4*r)} $\leftarrow$
+    \texttt{fun r -> k4(3*r)} $\leftarrow$ $\cdots$
+  \end{center}
+  \vspace{0.6em}
+  The full continuation eventually represents
+  \[
+    \texttt{fun r -> id(4 * (3 * (2 * (1 * r))))}
+  \]
+  \begin{block}{What changed?}
+    Direct style leaves pending work in the call stack. CPS represents that
+    work as functions passed explicitly from call to call.
+  \end{block}
+  \small (The displayed chain is schematic: each continuation closes over
+  the values needed for its multiplication.)
+\end{frame}
+
+% 3 minutes
+\begin{frame}[fragile]{Conditionals and function calls have CPS rules too}
+  \begin{lstlisting}
+CPS(if test then yes else no, k) =
+  CPS(test, fun b ->
+    if b then CPS(yes, k)
+         else CPS(no, k))
+  \end{lstlisting}
+  Only the chosen branch runs, and both branches receive the same continuation.
+  \vspace{0.5em}
+  A call \texttt{f(x)} first computes the function and argument, then applies
+  the function to the argument and continuation:
+  \begin{lstlisting}
+CPS(f(x), k) = CPS(f, fun vf ->
+  CPS(x, fun vx -> vf(vx, k)))
+  \end{lstlisting}
+  The exact rule depends on the language's evaluation order and calling convention.
+\end{frame}
+
+% 2 minutes
+\begin{frame}{CPS changes function types}
+  A direct function returning \texttt{A} and accepting \texttt{B} has type
+  \[
+    \texttt{B -> A}
+  \]
+  Its CPS version accepts a continuation from \texttt{A} to some answer type \texttt{R}:
+  \[
+    \texttt{B -> (A -> R) -> R}
+  \]
+  \begin{itemize}
+    \item \texttt{A}: the value the direct function would have returned.
+    \item \texttt{R}: the answer type chosen by the surrounding computation.
+  \end{itemize}
+  The continuation argument adds another function layer; polymorphic CPS may
+  quantify over \texttt{R}.
+\end{frame}
+
+% 2 minutes
+\begin{frame}{CPS and tail calls}
+  In \texttt{fact\_cps}, the recursive call is the final action in its branch:
+  \begin{center}
+    \texttt{fact\_cps(n - 1, continuation)}
+  \end{center}
+  It is a tail call: the caller has no instructions left after it returns.
+  \begin{itemize}
+    \item Tail-call execution can reuse the current stack frame.
+    \item CPS makes pending work explicit, but a continuation may still be a closure that uses memory.
+    \item CPS by itself does not guarantee constant space; representation and runtime behavior matter.
+  \end{itemize}
+\end{frame}
+
+% 2 minutes
+\begin{frame}{CPS can represent more than ordinary returns}
+  A function can choose which continuation to invoke:
+  \begin{itemize}
+    \item \textbf{Success and failure:} pass separate continuations for each outcome.
+    \item \textbf{Exceptions:} send errors to an exceptional continuation.
+    \item \textbf{Early exit:} invoke a continuation that skips the remaining work.
+    \item \textbf{Control operators:} capture and later invoke a saved continuation.
+  \end{itemize}
+  These ideas all make control flow visible as data: functions that can be
+  passed, stored, or selected.
+\end{frame}
+
+% 1 minute
+\begin{frame}{Summary}
+  \begin{itemize}
+    \item A continuation describes the rest of a computation.
+    \item CPS passes that continuation explicitly instead of returning a value.
+    \item Translation nests continuations around unfinished operations.
+    \item CPS exposes control flow and makes calls tail calls, while closures may still consume space.
+  \end{itemize}
+  \vspace{1em}
+  \begin{block}{Quick check}
+    In \texttt{fact\_cps}, why does the recursive call receive
+    \texttt{fun r -> k(n*r)} instead of \texttt{k} directly?
+  \end{block}
+\end{frame}
+
+% Optional example
+\begin{frame}[fragile]{Optional example: Fibonacci in direct style}
+  The Fibonacci function makes two recursive calls. The second call and the
+  addition are work that remains after the first call returns:
+  \begin{lstlisting}
+fib(n) =
+  if n <= 1 then n
+  else fib(n - 1) + fib(n - 2)
+  \end{lstlisting}
+  For example, \texttt{fib(4)} computes \texttt{fib(3) + fib(2)}, or
+  \texttt{2 + 1 = 3}. This definition returns its result normally; the caller
+  does not see the pending second call or addition.
+\end{frame}
+
+\begin{frame}[fragile]{Optional example: Fibonacci in CPS}
+  After \texttt{fib(n-1)} produces \texttt{left}, the function still needs
+  to compute \texttt{fib(n-2)} and add the two results. The continuation stores
+  that work:
+  \begin{lstlisting}
+fib_cps(n, k) =
+  if n <= 1 then k(n)
+  else fib_cps(n - 1, fun left ->
+    fib_cps(n - 2, fun right ->
+      k(left + right)))
+  \end{lstlisting}
+  Both recursive calls pass their results onward through continuations. With
+  the identity continuation, \texttt{fib\_cps(4, fun x -> x)} evaluates to 3.
+\end{frame}
+\begin{frame}[fragile]{Optional example: Fibonacci as lazy call events}
+  Record both the entry to a call and its return. The continuation produces
+  the remaining event stream after a recursive result is available:
+  \begin{lstlisting}
+event = Enter(n) | Return(value)
+emit(event, rest) = lazy_cons(event, delay(rest))
+fib_events(n, k) =
+  emit(Enter(n),
+    if n <= 1 then emit(Return(n), k(n))
+    else fib_events(n - 1, fun left ->
+      fib_events(n - 2, fun right ->
+        emit(Return(left + right), k(left + right)))))
+  \end{lstlisting}
+  Start with \texttt{fib\_events(4, fun result -> lazy\_empty)}. The outer
+  call emits \texttt{Enter(4)}; its recursive calls emit their own entry and
+  return events before the outer call emits \texttt{Return(3)}. The tail is
+  delayed, so events are produced as the consumer advances through the stream.
+\end{frame}
+
+\begin{frame}{The event consumer drives the computation}
+  Each invocation emits \texttt{Enter(n)} before its work and
+  \texttt{Return(value)} after its work. The continuation keeps the pending
+  second recursive call and addition, so returns appear in evaluation order.
+  \begin{block}{Event stream}
+    These are the only two event forms. The final event is the outer call's
+    return, whose value is the Fibonacci result.
+  \end{block}
+  A real implementation needs a lazy-list type whose tail is suspended, such
+  as a thunk or stream node.
+\end{frame}
+\end{document}

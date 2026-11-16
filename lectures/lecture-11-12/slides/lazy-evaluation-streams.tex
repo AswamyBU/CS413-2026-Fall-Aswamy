@@ -1,0 +1,256 @@
+\documentclass[aspectratio=169,10pt]{beamer}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{listings}
+\usepackage{xcolor}
+
+\definecolor{Ink}{HTML}{172B3A}
+\definecolor{Blue}{HTML}{235789}
+\definecolor{Muted}{HTML}{526574}
+\definecolor{Paper}{HTML}{F5F7F8}
+\definecolor{Code}{HTML}{EAF0F4}
+\setbeamercolor{normal text}{fg=Ink,bg=white}
+\setbeamercolor{frametitle}{fg=Ink,bg=white}
+\setbeamercolor{title}{fg=Ink}
+\setbeamercolor{structure}{fg=Blue}
+\setbeamercolor{block title}{fg=Blue,bg=white}
+\setbeamercolor{block body}{fg=Ink,bg=Paper}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+\setbeamersize{text margin left=0.7cm,text margin right=0.7cm}
+\setlength{\parskip}{0.35em}
+\lstset{basicstyle=\ttfamily\small,columns=fullflexible,keepspaces=true,
+  showstringspaces=false,breaklines=true,backgroundcolor=\color{Code},
+  frame=single,rulecolor=\color{Code},xleftmargin=0.4em,xrightmargin=0.4em,
+  aboveskip=0.6em,belowskip=0.6em}
+
+\title{Lazy Evaluation with Streams}
+\subtitle{Delaying work until a value is needed}
+\author{CS413}
+\date{Fall 2026}
+
+\begin{document}
+\begin{frame}[plain]\titlepage\end{frame}
+
+% 2 minutes
+\begin{frame}[fragile]{Evaluation can happen now or later}
+  In a strict language, a function's arguments are evaluated before the call.
+  Lazy evaluation delays a computation until its result is requested.
+  \begin{columns}[T]
+    \column{.48\textwidth}
+      \textbf{Strict argument}
+      \begin{lstlisting}
+choose(42, expensive())
+      \end{lstlisting}
+      Both arguments are evaluated before \texttt{choose} runs.
+    \column{.48\textwidth}
+      \textbf{Delayed argument}
+      \begin{lstlisting}
+choose(42, thunk(expensive))
+      \end{lstlisting}
+      The second computation can wait until it is needed.
+  \end{columns}
+  \vspace{0.5em}
+  This lecture uses explicit thunks and lazy streams, so the delay is visible
+  in the program rather than built into every expression.
+\end{frame}
+
+% 2 minutes
+\begin{frame}[fragile]{A thunk packages a deferred computation}
+  A thunk is a function with no meaningful input that computes a value later.
+  \begin{lstlisting}
+Lazy[T] = () -> T
+  \end{lstlisting}
+  In LAMBDA, the interface is written using \texttt{lazy\_make} and
+  \texttt{lazy\_eval}:
+  \begin{lstlisting}
+deferred : Lazy[sint] =
+  lazy_make(lam (u: unit) => 6 * 7)
+answer = lazy_eval(deferred)
+  \end{lstlisting}
+  Creating \texttt{deferred} stores the computation; \texttt{lazy\_eval}
+  requests its value. In this runtime, a lazy value caches its first result.
+\end{frame}
+
+% 2 minutes
+\begin{frame}[fragile]{A lazy stream delays the next cell}
+  A finite list stores its whole spine. A stream can store one cell now and
+  delay the rest.
+  \begin{lstlisting}
+Stcn[T] = stcn_nil()
+       | stcn_cons(head: T, tail: Strm[T])
+Strm[T] = Lazy[Stcn[T]]
+  \end{lstlisting}
+  \begin{itemize}
+    \item \texttt{stcn\_nil} marks the end.
+    \item \texttt{stcn\_cons(x, xs)} stores a head and a delayed stream tail.
+    \item The outer \texttt{Lazy} also delays inspection of the current cell.
+  \end{itemize}
+  This is the course library's explicit representation of a lazy list.
+\end{frame}
+
+% 3 minutes
+\begin{frame}[fragile]{Constructing a stream delays its constructor}
+  The library wraps a stream cell in a thunk:
+  \begin{lstlisting}
+strm_nil[T] : unit -> Strm[T] = lam (u) =>
+  lazy_make(lam (v) => stcn_nil())
+
+strm_cons[T] : (T, Strm[T]) -> Strm[T] = lam (p) =>
+  lazy_make(lam (u) => stcn_cons(p.0, p.1))
+  \end{lstlisting}
+  \begin{itemize}
+    \item Calling \texttt{strm\_cons} creates a stream value without inspecting its cell.
+    \item \texttt{strm\_head(xs)} forces the outer thunk, then reads the head.
+    \item \texttt{strm\_tail(xs)} gives the tail stream; its cell stays delayed.
+  \end{itemize}
+  Operations such as \texttt{strm\_head} need a nonempty stream.
+\end{frame}
+
+% 3 minutes
+\begin{frame}[fragile]{Demand propagates only as far as the consumer asks}
+  Suppose the stream has cells \texttt{1, 2, 3, ...}. To get the first head:
+  \begin{enumerate}
+    \item Force the outer lazy value to reveal a \texttt{stcn\_cons}.
+    \item Read its head, \texttt{1}.
+    \item Leave its tail untouched.
+  \end{enumerate}
+  \begin{lstlisting}
+strm_head(xs)               # forces one cell
+strm_head(strm_tail(xs))    # forces two cells
+  \end{lstlisting}
+  A consumer controls how much of a stream gets evaluated. Reusing a forced
+  lazy cell reuses its cached result in this implementation.
+\end{frame}
+
+% 3 minutes
+\begin{frame}[fragile]{A stream can describe an unbounded sequence}
+  Define a stream of integers starting at \texttt{n}; the recursive call sits
+  inside a thunk, so it does not run while the current cell is built:
+  \begin{lstlisting}
+naturals_from : sint -> Strm[sint] = fix from(n) =>
+  strm_cons(n,
+    lazy_make(lam (u: unit) => lazy_eval(from(n + 1))))
+  \end{lstlisting}
+  \begin{itemize}
+    \item Constructing \texttt{naturals\_from(0)} returns after building its first cell.
+    \item The tail computation builds the next cell only when demanded.
+    \item The stream has no final cell, but any finite prefix can be observed.
+  \end{itemize}
+  \texttt{strm\_range(lo, hi)} in the library is the corresponding finite example.
+\end{frame}
+
+% 3 minutes
+\begin{frame}[fragile]{Mapping transforms cells as they are requested}
+  \texttt{strm\_map} delays each output cell and maps the head when that cell
+  is forced:
+  \begin{lstlisting}
+strm_map(xs, lam (x) => x * 2)
+  \end{lstlisting}
+  For a source stream \texttt{1, 2, 3, ...}, its result describes
+  \texttt{2, 4, 6, ...}. Creating the mapped stream does not traverse the source.
+  \begin{lstlisting}
+strm_to_list(
+  strm_take(strm_map(naturals_from(1), lam (x) => x * 2), 4))
+# [2, 4, 6, 8]
+  \end{lstlisting}
+  \texttt{take} makes the finite demand explicit before conversion to a list.
+\end{frame}
+
+% 3 minutes
+\begin{frame}[fragile]{Filtering may search ahead for the next output}
+  \texttt{strm\_filter(xs, p)} skips input cells until it finds one satisfying \texttt{p}.
+  \begin{lstlisting}
+strm_filter(naturals_from(0), lam (n) => n > 5)
+  \end{lstlisting}
+  Asking for the first output forces inputs \texttt{0} through \texttt{6}.
+  Asking only whether an earlier cell matches can stop sooner:
+  \begin{lstlisting}
+strm_exists(xs, lam (n) => n == 3)
+  \end{lstlisting}
+  \texttt{strm\_exists} returns as soon as it finds a match. If the predicate
+  never matches an infinite stream, finding the first filtered cell never finishes.
+\end{frame}
+
+% 3 minutes
+\begin{frame}[fragile]{The sieve generates primes on demand}
+  Start with the stream \texttt{2, 3, 4, 5, ...}. Keep its head as the next
+  prime, filter multiples of that prime from the tail, then sieve the result:
+  \begin{lstlisting}
+sieve(xs) =
+  let p = strm_head(xs)
+  in strm_cons(p,
+       lazy_make(lam (u: unit) =>
+         lazy_eval(sieve(strm_filter(
+           strm_tail(xs), lam (n) => n mod p != 0)))))
+
+primes = sieve(naturals_from(2))
+  \end{lstlisting}
+  \begin{itemize}
+    \item The first output is \texttt{2}; its delayed tail removes multiples of 2.
+    \item The next head is \texttt{3}; the next delayed tail removes multiples of 3.
+    \item Taking a finite prefix forces only enough filtering and sieving to produce it.
+  \end{itemize}
+  \texttt{strm\_filter} here denotes the library filter; the recursive call is
+  delayed inside the tail thunk.
+\end{frame}
+
+% 3 minutes
+\begin{frame}{Lazy composition avoids intermediate lists}
+  A pipeline can describe a sequence of transformations:
+  \begin{center}
+    source stream \quad $\longrightarrow$ \quad map \quad $\longrightarrow$
+    \quad filter \quad $\longrightarrow$ \quad take
+  \end{center}
+  \begin{itemize}
+    \item Each stage produces a stream whose later cells remain delayed.
+    \item The consumer's request pulls values through the pipeline as needed.
+    \item No full intermediate list is required.
+  \end{itemize}
+  Laziness can save work and support infinite sources. It does not promise that
+  every pipeline uses less memory or runs faster; retained thunks can keep
+  earlier data reachable.
+\end{frame}
+
+% 2 minutes
+\begin{frame}[fragile]{Short-circuit consumers need only a prefix}
+  \texttt{strm\_exists} stops at the first matching item; \texttt{strm\_forall}
+  stops at the first item that fails the predicate.
+  \begin{lstlisting}
+strm_exists(xs, lam (x) => x == 1)
+  \end{lstlisting}
+  If the first cell of \texttt{xs} is 1, the result is \texttt{true}; the
+  consumer need not inspect any later cells. A delayed tail could diverge or
+  raise an error, and this result would still be available.
+  \begin{block}{Key idea}
+    A lazy program can avoid computations that its result does not depend on.
+  \end{block}
+\end{frame}
+
+% 2 minutes
+\begin{frame}{Laziness has costs and limits}
+  \begin{itemize}
+    \item A thunk needs a closure and may retain the values it captures.
+    \item Memoization avoids recomputing a forced cell, but cached values occupy memory.
+    \item A consumer that asks for the whole stream must still do all that work.
+    \item A nonproductive definition may loop before producing its first cell.
+  \end{itemize}
+  Ask two questions when evaluating a lazy pipeline: which cells are forced,
+  and which values remain reachable afterward?
+\end{frame}
+
+% 2 minutes
+\begin{frame}{Summary}
+  \begin{itemize}
+    \item Lazy evaluation delays work until a consumer demands a value.
+    \item A thunk represents a deferred computation; this LAMBDA runtime memoizes its result.
+    \item A stream is a lazy cell whose tail is another stream.
+    \item Mapping and filtering can operate on unbounded inputs, while consumers such as \texttt{take} and \texttt{exists} bound demand.
+  \end{itemize}
+  \vspace{0.7em}
+  \begin{block}{Quick check}
+    In \texttt{strm\_exists(xs, p)}, why might it be incorrect to force the
+    tail before testing the head?
+  \end{block}
+\end{frame}
+\end{document}

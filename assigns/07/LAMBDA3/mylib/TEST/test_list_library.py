@@ -6,7 +6,7 @@ from contextlib import redirect_stdout
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-import lambda2 as L
+import lambda3 as L
 from basics0 import fnlist_nil, fnlist_cons
 
 
@@ -15,6 +15,7 @@ class ListLibraryTests(unittest.TestCase):
     def setUpClass(cls):
         source = (Path(__file__).resolve().parents[1] / 'list.lam').read_text()
         cls.declarations = L.d0cls_parse(source)
+        L.d0cls_typecheck(cls.declarations)
 
     def evaluate(self, source):
         return L.d0exp_evaluate(L.D0Elets(self.declarations, L.d0exp_parse(source)))

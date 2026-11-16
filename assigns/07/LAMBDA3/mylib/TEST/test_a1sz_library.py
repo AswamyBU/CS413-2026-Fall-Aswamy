@@ -58,6 +58,33 @@ class A1szLibraryTests(unittest.TestCase):
             'a1sz_map(a1sz_make_nfun(3, lam (i) => i+1), lam (x) => x*3)'),
             '[3, 6, 9]')
 
+    def test_sorting(self):
+        self.assertEqual(self.formatted(
+            'let xs = a1sz_make_nfun(7, lam (i) => 6-i); r = a1sz_quicksort(xs, lam (p) => p.0<=p.1) in xs end'),
+            '[0, 1, 2, 3, 4, 5, 6]')
+        self.assertEqual(self.formatted(
+            'a1sz_quicksort(a1sz_make_nfun(6, lam (i) => i%3), lam (p) => p.0<=p.1)'),
+            '[0, 0, 1, 1, 2, 2]')
+        self.assertEqual(self.formatted(
+            'let xs = a1sz_make_nfun(7, lam (i) => 6-i); r = a1sz_insertionsort(xs, lam (p) => p.0<=p.1) in xs end'),
+            '[0, 1, 2, 3, 4, 5, 6]')
+        self.assertEqual(self.formatted(
+            'a1sz_insertionsort(a1sz_make_nfun(6, lam (i) => i%3), lam (p) => p.0<=p.1)'),
+            '[0, 0, 1, 1, 2, 2]')
+        self.assertEqual(self.formatted(
+            'a1sz_insertionsort(a1sz_make_nfun(0, lam (i) => i), lam (p) => p.0<=p.1)'),
+            '[]')
+        # The tags show that insertion sort leaves equal-key elements in input order.
+        self.assertEqual(self.formatted(
+            'let xs = a1sz_make_nfun(4, lam (i) => (i%2, i)); r = a1sz_insertionsort(xs, lam (p) => p.0.0<=p.1.0) in xs end'),
+            '[(0, 0), (0, 2), (1, 1), (1, 3)]')
+
+    def test_modulo_operator(self):
+        self.assertEqual(self.formatted('17%5'), '2')
+        self.assertEqual(self.formatted('2+17%5*3'), '8')
+        self.assertEqual(self.formatted('(-5)%3'), '1')
+        self.assertEqual(self.formatted('5%(-3)'), '-1')
+
     def test_filter_folds_and_predicates(self):
         self.assertEqual(self.formatted(
             'a1sz_filter_list(a1sz_make_nfun(6, lam (i) => i), lam (x) => x<3)'),

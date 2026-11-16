@@ -1,0 +1,11 @@
+# Tuple projections, recursive list processing, and option construction.
+let
+  sum : List[sint] -> sint =
+    fix sum(xs: List[sint]): sint =>
+      if list_nilq(xs) then 0
+      else list_head(xs) + sum(list_tail(xs));
+  values : List[sint] = list_cons(3, list_cons(4, list_cons(5, list_nil())));
+  total : Optn[sint] = optn_cons(sum(values))
+in
+  (sum(values), list_head(values), optn_nilq(total), optn_get(total))
+end

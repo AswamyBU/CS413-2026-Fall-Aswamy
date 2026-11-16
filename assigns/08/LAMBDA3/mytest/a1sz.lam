@@ -1,0 +1,9 @@
+# Sized arrays: copy construction, indexed access and update, and function construction.
+let
+  repeated : A1sz[sint] = a1sz_make_ncpy(3, 7);
+  generated : A1sz[sint] = a1sz_make_nfun(4, lam(i: sint) => i * 2);
+  updated : void = a1sz_setat(repeated, 1, 9)
+in
+  (a1sz_size(repeated), a1sz_getat(repeated, 0), a1sz_getat(repeated, 1),
+   a1sz_size(generated), a1sz_getat(generated, 3), updated)
+end

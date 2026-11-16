@@ -50,6 +50,66 @@ a1sz_concat[T] : A1sz[A1sz[T]] -> A1sz[T] = lam (xss) =>
 a1sz_map[T, U] : (A1sz[T], T -> U) -> A1sz[U] = lam (p) =>
   a1sz_make_nfun(a1sz_size(p.0), lam (i) => p.1(a1sz_getat(p.0, i)))
 
+# Sort an array in place using lteq(x, y), true when x is less than or equal
+# to y. Return the same array after sorting.
+a1sz_quicksort[T] : (A1sz[T], (T, T) -> bool) -> A1sz[T] = lam (p) =>
+  let
+    swap : (A1sz[T], sint, sint) -> void = lam (q) =>
+      let
+        tmp : T = a1sz_getat(q.0, q.1);
+        r1 : void = a1sz_setat(q.0, q.1, a1sz_getat(q.0, q.2))
+      in
+        a1sz_setat(q.0, q.2, tmp)
+      end;
+    partition : (A1sz[T], sint, sint, sint, (T, T) -> bool) -> sint =
+      fix partition(q) =>
+        if q.2 >= q.1 then
+          let r : void = swap(q.0, q.3, q.1) in q.3 end
+        else if q.4(a1sz_getat(q.0, q.2), a1sz_getat(q.0, q.1)) then
+          let r : void = swap(q.0, q.2, q.3)
+          in partition(q.0, q.1, q.2 + 1, q.3 + 1, q.4) end
+        else partition(q.0, q.1, q.2 + 1, q.3, q.4);
+    sort : (A1sz[T], sint, sint, (T, T) -> bool) -> unit = fix sort(q) =>
+      if q.1 >= q.2 then ()
+      else
+        let
+          pivot_index : sint = partition(q.0, q.2, q.1, q.1, q.3);
+          left : unit = sort(q.0, q.1, pivot_index - 1, q.3)
+        in
+          sort(q.0, pivot_index + 1, q.2, q.3)
+        end
+  in
+    let r : unit = sort(p.0, 0, a1sz_size(p.0) - 1, p.1) in p.0 end
+  end
+
+# Stable in-place insertion sort using lteq(x, y), true when x is less than
+# or equal to y. Returns the same array after sorting.
+a1sz_insertionsort[T] : (A1sz[T], (T, T) -> bool) -> A1sz[T] = lam (p) =>
+  let
+    insert : (A1sz[T], sint, T, (T, T) -> bool) -> void = fix insert(q) =>
+      if q.1 < 0 then a1sz_setat(q.0, 0, q.2)
+      else if q.3(a1sz_getat(q.0, q.1), q.2) then
+        a1sz_setat(q.0, q.1 + 1, q.2)
+      else
+        let
+          current : T = a1sz_getat(q.0, q.1);
+          shifted : void = a1sz_setat(q.0, q.1 + 1, current)
+        in
+          insert(q.0, q.1 - 1, q.2, q.3)
+        end;
+    sort : sint -> unit = fix sort(i) =>
+      if i >= a1sz_size(p.0) then ()
+      else
+        let
+          key : T = a1sz_getat(p.0, i);
+          inserted : void = insert(p.0, i - 1, key, p.1)
+        in
+          sort(i + 1)
+        end
+  in
+    let r : unit = sort(1) in p.0 end
+  end
+
 # Filter an array into a list, preserving order and calling the predicate once
 # per element.
 a1sz_filter_list[T] : (A1sz[T], T -> bool) -> List[T] = lam (p) =>

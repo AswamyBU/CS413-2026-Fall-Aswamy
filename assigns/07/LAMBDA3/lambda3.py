@@ -563,6 +563,12 @@ def d0exp_evaluate\
                 if not isinstance(dexp2, D0Vint):
                     raise TypeError(f"D0Vint(...) expected: {dexp2}")
                 return D0Vint(dexp1.arg1//dexp2.arg1)
+            case "%":
+                if not isinstance(dexp1, D0Vint):
+                    raise TypeError(f"D0Vint(...) expected: {dexp1}")
+                if not isinstance(dexp2, D0Vint):
+                    raise TypeError(f"D0Vint(...) expected: {dexp2}")
+                return D0Vint(dexp1.arg1%dexp2.arg1)
 ######
             case "<":
                 if not isinstance(dexp1, D0Vint):
@@ -677,7 +683,7 @@ class _Token:
 _TOKEN_PATTERN = re.compile(
     r'(?P<space>\s+)|(?P<comment>\#[^\n]*)|'
     r'(?P<int>[0-9]+)|(?P<name>[A-Za-z_][A-Za-z_0-9]*)|'
-    r'(?P<symbol>=>|->|<=|>=|==|!=|[()+*/<>=,.;:-]|\[|\])'
+    r'(?P<symbol>=>|->|<=|>=|==|!=|[()+*/%<>=,.;:-]|\[|\])'
 )
 _KEYWORDS = frozenset({'lam', 'fix', 'if', 'then', 'else', 'let', 'in',
                        'end', 'true', 'false', 'list_nil', 'list_cons', 'list_nilq',
@@ -846,7 +852,7 @@ class _Parser:
 
     def multiplicative(self) -> d0exp:
         result = self.unary()
-        while self.token.kind in ('*', '/'):
+        while self.token.kind in ('*', '/', '%'):
             operator = self.take(self.token.kind).text
             result = D0Eop2(operator, result, self.unary())
         return result
@@ -1266,7 +1272,7 @@ def d0exp_typecheck(dexp: d0exp) -> simple_type:
             raise TypeCheckError(f'unknown unary operator {expr.name!r}')
         if isinstance(expr, D0Eop2):
             left, right = check(expr.arg1, env), check(expr.arg2, env)
-            if expr.name in ('+', '-', '*', '/'):
+            if expr.name in ('+', '-', '*', '/', '%'):
                 solver.unify(left, TSint(), expr.name)
                 solver.unify(right, TSint(), expr.name)
                 return TSint()
@@ -1473,9 +1479,11 @@ class _PyCompiler:
             elif op == "a1sz_getat": rhs = f"_lambda_a1sz_getat({left.result}, {right.result})"
             elif op == "a1sz_make_ncpy": rhs = f"_lambda_a1sz_make_ncpy({left.result}, {right.result})"
             elif op == "a1sz_make_nfun": rhs = f"_lambda_a1sz_make_nfun({left.result}, {right.result})"
-            elif op in {"+", "-", "*", "/", "<", ">", "<=", ">=", "==", "!="}:
+            elif op in {"+", "-", "*", "/", "%", "<", ">", "<=", ">=", "==", "!="}:
                 if self.javascript and op == "/":
                     rhs = f"Math.floor({left.result} / {right.result})"
+                elif self.javascript and op == "%":
+                    rhs = f"({left.result} - Math.floor({left.result} / {right.result}) * {right.result})"
                 else:
                     target_op = "//" if op == "/" else op
                     if self.javascript and op in {"==", "!="}:
