@@ -1,0 +1,4 @@
+# No third-party Python packages. The service, solver bridge and tests use
+# only the Python 3.12+ standard library (http.server, json, unittest, uuid).
+# The LAMBDA3 implementation is the supplied ../LAMBDA3/lambda3.py.
+# Client tests need Node.js 20+ (built-in `node --test`), no npm packages.
