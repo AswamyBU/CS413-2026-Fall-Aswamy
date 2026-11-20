@@ -1,0 +1,184 @@
+# N-Queens search in continuation-passing style, producing a lazy event stream.
+#
+# Load with d0cls_parse + d0cls_typecheck, then evaluate inside D0Elets
+# (see queens/solver.py). Nothing here knows about HTTP or the browser.
+#
+# Representation
+#   Board  = List[sint]   one column per placed queen, NEWEST ROW FIRST.
+#                         A board of length k holds rows 0..k-1, and the
+#                         queen of row k-1-i is the i-th list element.
+#                         Invariant: no two queens on it attack each other.
+#   Event  = (sint, sint, sint, List[sint])
+#            = (kind, column, row, board-in-row-order)
+#            kind: 0 try, 1 place, 2 reject, 3 backtrack, 4 solution, 5 done.
+#            column/row are -1 for solution and done.
+#   Strm[Event] = Lazy[Stcn[Event]] (the library stream type).
+#
+# Continuations (all return the answer type Strm[Event]):
+#   on_solution : (Board, unit -> Strm[Event]) -> Strm[Event]
+#                 gets a complete board and the failure continuation that
+#                 resumes the search after it.
+#   on_exhausted, on_safe, on_conflict : unit -> Strm[Event]
+#
+# Reuse note: queen_attacks is the same three-way comparison as `safe` in
+# LAMBDA3/mytest/eight_queens.lam (there, rows are stored per column; here,
+# columns per row, so "same row" becomes "same column"). Everything else is
+# new: the reference solvers are direct-style, and eight_queens_stream.lam
+# builds its stream with strm_append instead of continuations.
+
+# ---------------------------------------------------------------- pure helpers
+
+# Does a queen already in column `previous`, `distance` rows above the
+# candidate row, attack a candidate in column `column`?
+queen_attacks : (sint, sint, sint) -> bool = lam (p: (sint, sint, sint)) =>
+  let
+    column = p.0;
+    distance = p.1;
+    previous = p.2
+  in
+    if previous == column then true
+    else if previous == column - distance then true
+    else if previous == column + distance then true
+    else false
+  end
+
+# CPS safety check. Walks the board from the newest queen (distance 1)
+# outward. Calls on_conflict at the first collision and on_safe after the
+# last queen; both calls are in tail position. It never returns a Boolean
+# to its caller. Polymorphic in the answer type so tests can use bool.
+check_safe[A] : (sint, sint, List[sint], unit -> A, unit -> A) -> A =
+  fix check_safe(p: (sint, sint, List[sint], unit -> A, unit -> A)): A =>
+    let
+      column = p.0;
+      distance = p.1;
+      board = p.2;
+      on_safe = p.3;
+      on_conflict = p.4
+    in
+      if list_nilq(board) then on_safe()
+      else if queen_attacks(column, distance, list_head(board)) then on_conflict()
+      else check_safe(column, distance + 1, list_tail(board), on_safe, on_conflict)
+    end
+
+# Extend a partial board with a queen in the next row.
+place : (sint, List[sint]) -> List[sint] = lam (p: (sint, List[sint])) =>
+  list_cons(p.0, p.1)
+
+# Convert newest-first storage to row order for events.
+board_rows : List[sint] -> List[sint] = lam (board: List[sint]) =>
+  let
+    loop : (List[sint], List[sint]) -> List[sint] =
+      fix loop(q: (List[sint], List[sint])): List[sint] =>
+        if list_nilq(q.0) then q.1
+        else loop(list_tail(q.0), list_cons(list_head(q.0), q.1))
+  in
+    loop(board, list_nil())
+  end
+
+# ---------------------------------------------------------- event constructors
+
+event_try : (sint, sint, List[sint]) -> (sint, sint, sint, List[sint]) =
+  lam (p: (sint, sint, List[sint])) => (0, p.0, p.1, board_rows(p.2))
+
+event_place : (sint, sint, List[sint]) -> (sint, sint, sint, List[sint]) =
+  lam (p: (sint, sint, List[sint])) => (1, p.0, p.1, board_rows(p.2))
+
+event_reject : (sint, sint, List[sint]) -> (sint, sint, sint, List[sint]) =
+  lam (p: (sint, sint, List[sint])) => (2, p.0, p.1, board_rows(p.2))
+
+event_backtrack : (sint, sint, List[sint]) -> (sint, sint, sint, List[sint]) =
+  lam (p: (sint, sint, List[sint])) => (3, p.0, p.1, board_rows(p.2))
+
+event_solution : List[sint] -> (sint, sint, sint, List[sint]) =
+  lam (board: List[sint]) => (4, 0 - 1, 0 - 1, board_rows(board))
+
+event_done : unit -> (sint, sint, sint, List[sint]) =
+  lam (u: unit) => (5, 0 - 1, 0 - 1, list_nil())
+
+# ------------------------------------------------------------- lazy emission
+
+# emit_lazy(event, tail): a stream whose first cell is `event`. Neither the
+# cell nor the tail is computed here. Forcing the cell builds stcn_cons with
+# a still-suspended tail; forcing that tail finally calls the continuation,
+# which runs the search only as far as the next emit_lazy.
+emit_lazy : ((sint, sint, sint, List[sint]),
+             unit -> Strm[(sint, sint, sint, List[sint])])
+            -> Strm[(sint, sint, sint, List[sint])] =
+  lam (p: ((sint, sint, sint, List[sint]),
+           unit -> Strm[(sint, sint, sint, List[sint])])) =>
+    lazy_make(lam (u: unit) =>
+      stcn_cons(p.0, lazy_make(lam (v: unit) => lazy_eval(p.1()))))
+
+empty_events : unit -> Strm[(sint, sint, sint, List[sint])] =
+  lam (u: unit) => lazy_make(lam (v: unit) => stcn_nil())
+
+# ---------------------------------------------------------------- CPS search
+
+# try_column(n, row, column, board, on_solution, on_exhausted)
+# Try `column` (and then the columns to its right) for the queen of `row`.
+# The local `search` is the pseudocode's search(row, board, sk, fk); it is
+# defined inside the fix so the two can call each other.
+try_column : (sint, sint, sint, List[sint],
+              (List[sint], unit -> Strm[(sint, sint, sint, List[sint])])
+                -> Strm[(sint, sint, sint, List[sint])],
+              unit -> Strm[(sint, sint, sint, List[sint])])
+             -> Strm[(sint, sint, sint, List[sint])] =
+  fix try_column(st: (sint, sint, sint, List[sint],
+                      (List[sint], unit -> Strm[(sint, sint, sint, List[sint])])
+                        -> Strm[(sint, sint, sint, List[sint])],
+                      unit -> Strm[(sint, sint, sint, List[sint])]))
+      : Strm[(sint, sint, sint, List[sint])] =>
+    let
+      n = st.0;
+      row = st.1;
+      column = st.2;
+      board = st.3;
+      on_solution = st.4;
+      on_exhausted = st.5;
+      search : (sint, List[sint], unit -> Strm[(sint, sint, sint, List[sint])])
+               -> Strm[(sint, sint, sint, List[sint])] =
+        lam (q: (sint, List[sint], unit -> Strm[(sint, sint, sint, List[sint])])) =>
+          if q.0 == n then on_solution(q.1, q.2)
+          else try_column(n, q.0, 0, q.1, on_solution, q.2);
+      # Failure continuation for this row: move on to the next column.
+      next_column : unit -> Strm[(sint, sint, sint, List[sint])] =
+        lam (u: unit) => try_column(n, row, column + 1, board, on_solution, on_exhausted)
+    in
+      if column == n then on_exhausted()
+      else emit_lazy(event_try(column, row, board), lam (u: unit) =>
+        check_safe(column, 1, board,
+          # on_safe: place the queen, then search the next row. The failure
+          # continuation handed down records the backtrack and resumes here.
+          lam (s: unit) =>
+            let next_board = place(column, board)
+            in
+              emit_lazy(event_place(column, row, next_board), lam (v: unit) =>
+                search(row + 1, next_board, lam (w: unit) =>
+                  emit_lazy(event_backtrack(column, row, board), next_column)))
+            end,
+          # on_conflict: record the rejection, then try the next column.
+          lam (c: unit) => emit_lazy(event_reject(column, row, board), next_column)))
+    end
+
+# The success continuation: emit the solution, then resume with `resume`.
+on_solution : (List[sint], unit -> Strm[(sint, sint, sint, List[sint])])
+              -> Strm[(sint, sint, sint, List[sint])] =
+  lam (p: (List[sint], unit -> Strm[(sint, sint, sint, List[sint])])) =>
+    emit_lazy(event_solution(p.0), p.1)
+
+# The root failure continuation: every root column is exhausted.
+root_exhausted : unit -> Strm[(sint, sint, sint, List[sint])] =
+  lam (u: unit) => emit_lazy(event_done(), empty_events)
+
+# queens_stream_with(n, root): the whole trace, with a caller-chosen root
+# failure continuation (tests pass one that fails, to prove the end of the
+# search is never reached early). The outer lazy_make means that building
+# the stream does no search work at all, not even the row-0 setup.
+queens_stream_with : (sint, unit -> Strm[(sint, sint, sint, List[sint])])
+                     -> Strm[(sint, sint, sint, List[sint])] =
+  lam (p: (sint, unit -> Strm[(sint, sint, sint, List[sint])])) =>
+    lazy_make(lam (u: unit) =>
+      lazy_eval(try_column(p.0, 0, 0, list_nil(), on_solution, p.1)))
+
+queens_stream : sint -> Strm[(sint, sint, sint, List[sint])] =
+  lam (n: sint) => queens_stream_with(n, root_exhausted)
