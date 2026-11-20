@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>N-Queens Search</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-state="idle">
+  <header>
+    <h1>N-Queens: CPS search, one lazy event at a time</h1>
+    <p class="sub">Each step asks the server to force the next cell of a LAMBDA3 lazy stream.</p>
+  </header>
+
+  <main>
+    <section class="board-panel">
+      <div id="board" class="board" aria-label="chess board"></div>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+      <div id="error" class="error" role="alert" hidden>
+        <span id="error-text"></span>
+        <button id="error-dismiss" type="button" aria-label="Dismiss error">×</button>
+      </div>
+      <button id="restart" class="restart" type="button" hidden>Restart search</button>
+    </section>
+
+    <section class="side">
+      <div class="controls">
+        <button id="start" type="button">Start</button>
+        <button id="step" type="button" disabled>Step</button>
+        <button id="play" type="button" disabled>Play</button>
+        <button id="next-solution" type="button" disabled>Next solution</button>
+        <button id="reset" type="button" disabled>Reset</button>
+      </div>
+      <div class="settings">
+        <label>Board
+          <select id="size">
+            <option>4</option><option>5</option><option>6</option><option>7</option>
+            <option selected>8</option><option>9</option><option>10</option>
+          </select>
+        </label>
+        <label>Speed
+          <input id="speed" type="range" min="0" max="1000" step="10" value="200">
+          <span id="speed-label"></span>
+        </label>
+      </div>
+
+      <dl class="stats">
+        <div><dt>Solutions</dt><dd id="solutions">0</dd></div>
+        <div><dt>Events</dt><dd id="events">0</dd></div>
+        <div><dt>Tries</dt><dd id="tries">0</dd></div>
+        <div><dt>Rejects</dt><dd id="rejects">0</dd></div>
+        <div><dt>Backtracks</dt><dd id="backtracks">0</dd></div>
+      </dl>
+      <p class="last">Last solution: <code id="last-solution">—</code></p>
+
+      <ul class="legend">
+        <li><span class="swatch try"></span>try</li>
+        <li><span class="swatch place"></span>place</li>
+        <li><span class="swatch reject"></span>reject</li>
+        <li><span class="swatch conflict"></span>attacker</li>
+        <li><span class="swatch backtrack"></span>backtrack</li>
+        <li><span class="swatch solution"></span>solution</li>
+      </ul>
+
+      <h2>Event log <small>(newest first)</small></h2>
+      <ol id="log" class="log"></ol>
+    </section>
+  </main>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
