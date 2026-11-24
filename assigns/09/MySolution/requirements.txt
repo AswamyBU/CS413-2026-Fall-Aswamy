@@ -1,0 +1,5 @@
+# Runtime
+Flask>=3.1,<4
+# Tests only: validates every API response against openapi.json
+jsonschema>=4.23,<5
+# Studio JS tests and the integration demo also need Node.js 20+ (no npm packages).
