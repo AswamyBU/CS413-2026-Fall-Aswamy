@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LAMBDA Studio</title>
+  <link rel="stylesheet" href="studio.css">
+</head>
+<body>
+  <header class="top">
+    <h1>LAMBDA Studio</h1>
+    <div class="services" aria-live="polite">
+      <span id="db-status" class="pill">database: …</span>
+      <span id="lambda-status" class="pill">LAMBDA3: …</span>
+    </div>
+  </header>
+  <p class="memory-warning" role="note">
+    <strong>Memory only:</strong> programs and test collections are stored in the
+    database service's memory. They survive page reloads, but
+    <strong>everything is cleared when the service stops</strong>.
+  </p>
+  <div id="notice" class="notice" role="alert" hidden></div>
+
+  <main class="layout">
+    <aside class="sidebar">
+      <section>
+        <div class="section-head">
+          <h2>Programs</h2>
+          <button id="new-program" type="button">New</button>
+        </div>
+        <ul id="program-list" class="list"></ul>
+        <button id="more-programs" type="button" class="link" hidden>Load more</button>
+      </section>
+      <section>
+        <div class="section-head">
+          <h2>Test collections</h2>
+          <button id="new-collection" type="button">New</button>
+        </div>
+        <ul id="collection-list" class="list"></ul>
+        <button id="more-collections" type="button" class="link" hidden>Load more</button>
+      </section>
+      <button id="refresh-lists" type="button" class="link">Refresh lists</button>
+    </aside>
+
+    <section class="workspace">
+      <!-- Program editor -->
+      <article id="program-panel" class="panel" hidden>
+        <div class="panel-head">
+          <h2 id="program-title">Program</h2>
+          <span id="program-meta" class="meta"></span>
+          <span id="program-dirty" class="dirty" hidden>● Unsaved changes</span>
+        </div>
+        <div id="program-conflict" class="conflict" hidden></div>
+        <label>Name <input id="program-name" type="text" maxlength="100" autocomplete="off"></label>
+        <label>Description <input id="program-description" type="text" maxlength="2000" autocomplete="off"></label>
+        <label>Source <textarea id="program-source" rows="10" spellcheck="false"></textarea></label>
+        <p id="program-error" class="field-error" hidden></p>
+        <div class="actions">
+          <button id="save-program" type="button" class="primary">Save</button>
+          <button id="reload-program" type="button">Reload from server</button>
+          <button id="run-program" type="button">Run with LAMBDA3</button>
+          <button id="case-from-program" type="button">Add as test case…</button>
+          <button id="delete-program" type="button" class="danger">Delete</button>
+        </div>
+        <pre id="program-output" class="output" hidden></pre>
+      </article>
+
+      <!-- Collection editor -->
+      <article id="collection-panel" class="panel" hidden>
+        <div class="panel-head">
+          <h2 id="collection-title">Test collection</h2>
+          <span id="collection-meta" class="meta"></span>
+          <span id="collection-dirty" class="dirty" hidden>● Unsaved changes</span>
+        </div>
+        <div id="collection-conflict" class="conflict" hidden></div>
+        <label>Name <input id="collection-name" type="text" maxlength="100" autocomplete="off"></label>
+        <label>Description <input id="collection-description" type="text" maxlength="2000" autocomplete="off"></label>
+        <p id="collection-error" class="field-error" hidden></p>
+        <div class="actions">
+          <button id="save-collection" type="button" class="primary">Save details</button>
+          <button id="reload-collection" type="button">Reload from server</button>
+          <button id="delete-collection" type="button" class="danger">Delete collection</button>
+        </div>
+
+        <div id="cases-block">
+          <div class="section-head">
+            <h3>Test cases <small id="case-count"></small></h3>
+            <button id="add-case" type="button">Add case</button>
+            <button id="run-collection" type="button" class="primary">Run collection</button>
+          </div>
+          <table class="cases">
+            <thead><tr><th>#</th><th>Name</th><th>Expected</th><th>Last run</th><th></th></tr></thead>
+            <tbody id="case-rows"></tbody>
+          </table>
+
+          <form id="case-form" class="case-form" hidden>
+            <h3 id="case-form-title">New test case</h3>
+            <span id="case-dirty" class="dirty" hidden>● Unsaved changes</span>
+            <label>Name <input id="case-name" type="text" maxlength="100" autocomplete="off"></label>
+            <label>Source snapshot <textarea id="case-source" rows="6" spellcheck="false"></textarea></label>
+            <fieldset class="expected">
+              <legend>Expected outcome</legend>
+              <label class="inline"><input type="radio" name="case-kind" value="value" checked> Value</label>
+              <input id="case-value" type="text" placeholder="formatted value, e.g. 720" autocomplete="off">
+              <label class="inline"><input type="radio" name="case-kind" value="error"> Error</label>
+              <select id="case-category">
+                <option value="syntax">syntax error</option>
+                <option value="type">type error</option>
+              </select>
+            </fieldset>
+            <label>Description <input id="case-description" type="text" maxlength="2000" autocomplete="off"></label>
+            <p id="case-error" class="field-error" hidden></p>
+            <div class="actions">
+              <button id="save-case" type="submit" class="primary">Save case</button>
+              <button id="cancel-case" type="button">Cancel</button>
+            </div>
+          </form>
+
+          <div id="run-summary" class="run-summary" hidden></div>
+        </div>
+      </article>
+
+      <article id="empty-panel" class="panel empty">
+        <h2>Welcome</h2>
+        <p>Pick a program or test collection on the left, or create a new one.</p>
+        <p>Programs and test cases are saved to the in-memory database service.
+          Running uses the LAMBDA3 service; the database never runs code.</p>
+      </article>
+    </section>
+  </main>
+
+  <dialog id="pick-collection">
+    <form method="dialog">
+      <h3>Add this program as a test case</h3>
+      <p>The case stores a copy of the current source. Later edits to the
+        program will not change it.</p>
+      <label>Collection <select id="pick-collection-select"></select></label>
+      <div class="actions">
+        <button value="ok" class="primary">Continue</button>
+        <button value="cancel">Cancel</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
