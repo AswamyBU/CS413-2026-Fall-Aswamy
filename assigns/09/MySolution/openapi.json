@@ -1,0 +1,290 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LAMBDA-studio Database Service",
+    "version": "1.0",
+    "description": "In-memory store for LAMBDA programs and test collections. Data is lost when the service process stops. See API.md for the full rules."
+  },
+  "servers": [{ "url": "http://127.0.0.1:8009/api/v1" }],
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "health",
+        "responses": {
+          "200": { "description": "Service is up", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Health" } } } }
+        }
+      }
+    },
+    "/programs": {
+      "post": {
+        "operationId": "createProgram",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProgramInput" } } } },
+        "responses": {
+          "201": { "$ref": "#/components/responses/ProgramCreated" },
+          "400": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" },
+          "413": { "$ref": "#/components/responses/Error" },
+          "415": { "$ref": "#/components/responses/Error" }
+        }
+      },
+      "get": {
+        "operationId": "listPrograms",
+        "parameters": [{ "$ref": "#/components/parameters/Limit" }, { "$ref": "#/components/parameters/Cursor" }],
+        "responses": {
+          "200": { "description": "One page", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProgramPage" } } } },
+          "400": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/programs/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/ProgramId" }],
+      "get": {
+        "operationId": "getProgram",
+        "responses": {
+          "200": { "$ref": "#/components/responses/Program" },
+          "400": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      },
+      "put": {
+        "operationId": "updateProgram",
+        "parameters": [{ "$ref": "#/components/parameters/IfMatch" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProgramInput" } } } },
+        "responses": {
+          "200": { "$ref": "#/components/responses/Program" },
+          "400": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" },
+          "413": { "$ref": "#/components/responses/Error" },
+          "415": { "$ref": "#/components/responses/Error" },
+          "428": { "$ref": "#/components/responses/Error" }
+        }
+      },
+      "delete": {
+        "operationId": "deleteProgram",
+        "parameters": [{ "$ref": "#/components/parameters/IfMatch" }],
+        "responses": {
+          "204": { "description": "Deleted" },
+          "400": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" },
+          "428": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/collections": {
+      "post": {
+        "operationId": "createCollection",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CollectionInput" } } } },
+        "responses": {
+          "201": { "$ref": "#/components/responses/CollectionCreated" },
+          "400": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" },
+          "413": { "$ref": "#/components/responses/Error" },
+          "415": { "$ref": "#/components/responses/Error" }
+        }
+      },
+      "get": {
+        "operationId": "listCollections",
+        "parameters": [{ "$ref": "#/components/parameters/Limit" }, { "$ref": "#/components/parameters/Cursor" }],
+        "responses": {
+          "200": { "description": "One page", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CollectionPage" } } } },
+          "400": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/collections/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/CollectionId" }],
+      "get": {
+        "operationId": "getCollection",
+        "responses": {
+          "200": { "$ref": "#/components/responses/Collection" },
+          "400": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      },
+      "put": {
+        "operationId": "updateCollection",
+        "description": "Updates name and description only; cases and their order are unchanged.",
+        "parameters": [{ "$ref": "#/components/parameters/IfMatch" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CollectionInput" } } } },
+        "responses": {
+          "200": { "$ref": "#/components/responses/Collection" },
+          "400": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" },
+          "413": { "$ref": "#/components/responses/Error" },
+          "415": { "$ref": "#/components/responses/Error" },
+          "428": { "$ref": "#/components/responses/Error" }
+        }
+      },
+      "delete": {
+        "operationId": "deleteCollection",
+        "parameters": [{ "$ref": "#/components/parameters/IfMatch" }],
+        "responses": {
+          "204": { "description": "Deleted with all of its cases" },
+          "400": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" },
+          "428": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/collections/{id}/cases": {
+      "parameters": [{ "$ref": "#/components/parameters/CollectionId" }],
+      "post": {
+        "operationId": "addCase",
+        "description": "Appends one case. Uses and increments the collection revision.",
+        "parameters": [{ "$ref": "#/components/parameters/IfMatch" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CaseInput" } } } },
+        "responses": {
+          "201": { "$ref": "#/components/responses/Collection" },
+          "400": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" },
+          "413": { "$ref": "#/components/responses/Error" },
+          "415": { "$ref": "#/components/responses/Error" },
+          "428": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/collections/{id}/cases/{case_id}": {
+      "parameters": [{ "$ref": "#/components/parameters/CollectionId" }, { "$ref": "#/components/parameters/CaseId" }],
+      "put": {
+        "operationId": "updateCase",
+        "description": "Replaces the case in place (same ID and position). Increments the collection revision.",
+        "parameters": [{ "$ref": "#/components/parameters/IfMatch" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CaseInput" } } } },
+        "responses": {
+          "200": { "$ref": "#/components/responses/Collection" },
+          "400": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" },
+          "413": { "$ref": "#/components/responses/Error" },
+          "415": { "$ref": "#/components/responses/Error" },
+          "428": { "$ref": "#/components/responses/Error" }
+        }
+      },
+      "delete": {
+        "operationId": "deleteCase",
+        "description": "Removes the case; the remaining cases keep their order. Increments the collection revision.",
+        "parameters": [{ "$ref": "#/components/parameters/IfMatch" }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/Collection" },
+          "400": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" },
+          "428": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "ProgramId": { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "pattern": "^prg_[0-9a-f]{16}$" } },
+      "CollectionId": { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "pattern": "^col_[0-9a-f]{16}$" } },
+      "CaseId": { "name": "case_id", "in": "path", "required": true, "schema": { "type": "string", "pattern": "^case_[0-9a-f]{16}$" } },
+      "Limit": { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 } },
+      "Cursor": { "name": "cursor", "in": "query", "required": false, "schema": { "type": "string", "minLength": 1 } },
+      "IfMatch": { "name": "If-Match", "in": "header", "required": true, "description": "Current revision as a strong entity tag, e.g. \"3\". Missing: 428.", "schema": { "type": "string", "pattern": "^\"[1-9][0-9]*\"$" } }
+    },
+    "headers": {
+      "ETag": { "description": "Current revision as a strong entity tag, e.g. \"3\"", "schema": { "type": "string", "pattern": "^\"[1-9][0-9]*\"$" } }
+    },
+    "responses": {
+      "Program": { "description": "One program", "headers": { "ETag": { "$ref": "#/components/headers/ETag" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProgramEnvelope" } } } },
+      "ProgramCreated": { "description": "Created", "headers": { "ETag": { "$ref": "#/components/headers/ETag" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProgramEnvelope" } } } },
+      "Collection": { "description": "One collection with its ordered cases", "headers": { "ETag": { "$ref": "#/components/headers/ETag" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CollectionEnvelope" } } } },
+      "CollectionCreated": { "description": "Created", "headers": { "ETag": { "$ref": "#/components/headers/ETag" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CollectionEnvelope" } } } },
+      "Error": { "description": "Error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+    },
+    "schemas": {
+      "Health": {
+        "type": "object", "additionalProperties": false, "required": ["status", "version"],
+        "properties": { "status": { "const": "ok" }, "version": { "const": "1.0" } }
+      },
+      "Name": { "type": "string", "minLength": 1, "maxLength": 100, "pattern": "\\S" },
+      "Source": { "type": "string", "minLength": 1, "pattern": "\\S", "description": "At most 65,536 UTF-8 bytes" },
+      "Description": { "type": "string", "maxLength": 2000 },
+      "Timestamp": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$" },
+      "Revision": { "type": "integer", "minimum": 1 },
+      "Expected": {
+        "oneOf": [
+          { "type": "object", "additionalProperties": false, "required": ["kind", "value"],
+            "properties": { "kind": { "const": "value" }, "value": { "type": "string", "minLength": 1, "maxLength": 10000 } } },
+          { "type": "object", "additionalProperties": false, "required": ["kind", "category"],
+            "properties": { "kind": { "const": "error" }, "category": { "enum": ["syntax", "type"] } } }
+        ]
+      },
+      "ProgramInput": {
+        "type": "object", "additionalProperties": false, "required": ["name", "source"],
+        "properties": { "name": { "$ref": "#/components/schemas/Name" }, "source": { "$ref": "#/components/schemas/Source" }, "description": { "$ref": "#/components/schemas/Description" } }
+      },
+      "CollectionInput": {
+        "type": "object", "additionalProperties": false, "required": ["name"],
+        "properties": { "name": { "$ref": "#/components/schemas/Name" }, "description": { "$ref": "#/components/schemas/Description" } }
+      },
+      "CaseInput": {
+        "type": "object", "additionalProperties": false, "required": ["name", "source", "expected"],
+        "properties": { "name": { "$ref": "#/components/schemas/Name" }, "source": { "$ref": "#/components/schemas/Source" }, "expected": { "$ref": "#/components/schemas/Expected" }, "description": { "$ref": "#/components/schemas/Description" } }
+      },
+      "Program": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "name", "source", "description", "created_at", "updated_at", "revision"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^prg_[0-9a-f]{16}$" },
+          "name": { "$ref": "#/components/schemas/Name" }, "source": { "$ref": "#/components/schemas/Source" },
+          "description": { "$ref": "#/components/schemas/Description" },
+          "created_at": { "$ref": "#/components/schemas/Timestamp" }, "updated_at": { "$ref": "#/components/schemas/Timestamp" },
+          "revision": { "$ref": "#/components/schemas/Revision" }
+        }
+      },
+      "Case": {
+        "type": "object", "additionalProperties": false, "required": ["id", "name", "source", "expected", "description"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^case_[0-9a-f]{16}$" },
+          "name": { "$ref": "#/components/schemas/Name" }, "source": { "$ref": "#/components/schemas/Source" },
+          "expected": { "$ref": "#/components/schemas/Expected" }, "description": { "$ref": "#/components/schemas/Description" }
+        }
+      },
+      "Collection": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "name", "description", "created_at", "updated_at", "revision", "cases"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^col_[0-9a-f]{16}$" },
+          "name": { "$ref": "#/components/schemas/Name" }, "description": { "$ref": "#/components/schemas/Description" },
+          "created_at": { "$ref": "#/components/schemas/Timestamp" }, "updated_at": { "$ref": "#/components/schemas/Timestamp" },
+          "revision": { "$ref": "#/components/schemas/Revision" },
+          "cases": { "type": "array", "maxItems": 200, "items": { "$ref": "#/components/schemas/Case" } }
+        }
+      },
+      "ProgramEnvelope": { "type": "object", "additionalProperties": false, "required": ["program"], "properties": { "program": { "$ref": "#/components/schemas/Program" } } },
+      "CollectionEnvelope": { "type": "object", "additionalProperties": false, "required": ["collection"], "properties": { "collection": { "$ref": "#/components/schemas/Collection" } } },
+      "ProgramPage": {
+        "type": "object", "additionalProperties": false, "required": ["items", "next_cursor"],
+        "properties": { "items": { "type": "array", "maxItems": 100, "items": { "$ref": "#/components/schemas/Program" } }, "next_cursor": { "type": ["string", "null"] } }
+      },
+      "CollectionPage": {
+        "type": "object", "additionalProperties": false, "required": ["items", "next_cursor"],
+        "properties": { "items": { "type": "array", "maxItems": 100, "items": { "$ref": "#/components/schemas/Collection" } }, "next_cursor": { "type": ["string", "null"] } }
+      },
+      "Error": {
+        "type": "object", "additionalProperties": false, "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "object", "required": ["code", "message"],
+            "properties": {
+              "code": { "enum": ["invalid_request", "record_not_found", "method_not_allowed", "duplicate_name", "revision_conflict", "capacity_limit", "payload_too_large", "unsupported_media_type", "precondition_required", "internal_error"] },
+              "message": { "type": "string", "minLength": 1 },
+              "field": { "type": "string" },
+              "parameter": { "type": "string" },
+              "current_revision": { "$ref": "#/components/schemas/Revision" },
+              "limit": { "type": "integer" },
+              "actual": { "type": "integer" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
